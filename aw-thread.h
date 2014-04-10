@@ -26,7 +26,7 @@
 
 #include <stddef.h>
 
-#if !_WIN32
+#if __GNUC__
 # include <stdint.h>
 #endif
 
