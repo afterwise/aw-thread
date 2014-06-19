@@ -1,4 +1,5 @@
 
+#include "aw-once.h"
 #include "aw-thread.h"
 #include <stdio.h>
 
@@ -7,11 +8,19 @@ struct tdata {
 	const char *str;
 };
 
+static once_tag_t tag;
+
 void tmain(uintptr_t data) {
 	struct tdata *tdata = (struct tdata *) data;
+	int uno = 0;
+
+	if (once_start(&tag)) {
+		uno = 1;
+		once_finalize(&tag);
+	}
 
 	sema_acquire(tdata->sema, 1);
-	printf("tmain: %s\n", tdata->str);
+	printf("tmain: %s uno=%d\n", tdata->str, uno);
 
 	thread_exit();
 }
