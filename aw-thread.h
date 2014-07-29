@@ -54,10 +54,10 @@ thread_id_t thread_spawn(
 	thread_start_t *start, enum thread_priority priority,
 	size_t stack_size, uintptr_t user_data);
 
-void thread_exit();
+void thread_exit(void);
 void thread_join(thread_id_t id);
 
-sema_id_t sema_create();
+sema_id_t sema_create(void);
 void sema_destroy(sema_id_t id);
 
 void sema_acquire(sema_id_t id, unsigned count);

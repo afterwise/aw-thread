@@ -84,7 +84,7 @@ thread_id_t thread_spawn(
 #endif
 }
 
-void thread_exit() {
+void thread_exit(void) {
 #if _WIN32
 	ExitThread(0);
 #elif __CELLOS_LV2__
@@ -106,7 +106,7 @@ void thread_join(thread_id_t id) {
 #endif
 }
 
-sema_id_t sema_create() {
+sema_id_t sema_create(void) {
 #if _WIN32
 	return (sema_id_t) CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
 #elif __CELLOS_LV2__
