@@ -22,16 +22,17 @@
  */
 
 #include "aw-thread.h"
+#include <stdio.h>
 
 #if __CELLOS_LV2__
 # include <sys/ppu_thread.h>
 # include <sys/synchronization.h>
 #elif __APPLE__
 # include <mach/mach_init.h>
+# include <mach/thread_policy.h>
 # include <mach/semaphore.h>
 # include <mach/task.h>
 #elif __linux__
-# include <errno.h>
 # include <semaphore.h>
 # endif
 
@@ -40,8 +41,19 @@
 # include <unistd.h>
 #endif
 
+#if __APPLE__
+/* from mach/thread_policy.h */
+kern_return_t thread_policy_set(
+	thread_t thread, thread_policy_flavor_t flavor,
+	thread_policy_t policy_info, mach_msg_type_number_t count);
+kern_return_t thread_policy_get(
+	thread_t thread, thread_policy_flavor_t flavor,
+	thread_policy_t policy_info, mach_msg_type_number_t *count,
+	boolean_t *get_default);
+#endif
+
 thread_id_t thread_spawn(
-		thread_start_t *start, enum thread_priority priority,
+		thread_start_t *start, enum thread_priority priority, int affinity,
 		size_t stack_size, uintptr_t user_data) {
 #if _WIN32
 	HANDLE id = CreateThread(
@@ -49,6 +61,8 @@ thread_id_t thread_spawn(
 		CREATE_SUSPENDED, NULL);
 
 	SetThreadPriority(id, 1 - priority);
+	if (affinity != THREAD_NO_AFFINITY)
+		SetThreadAffinityMask(id, 1 << affinity);
 	ResumeThread(id);
 
 	return (thread_id_t) id;
@@ -61,6 +75,9 @@ thread_id_t thread_spawn(
 
 	return id;
 #elif __linux__ || __APPLE__
+# if __APPLE__
+	thread_port_t tp;
+# endif
 	pthread_t id;
 	pthread_attr_t attr;
 	struct sched_param param;
@@ -77,7 +94,44 @@ thread_id_t thread_spawn(
 	pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 	pthread_attr_setschedparam(&attr, &param);
-	pthread_create(&id, &attr, (void *(*)(void *)) start, (void *) user_data);
+	if (priority == THREAD_HIGH_PRIORITY)
+		pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+#if __APPLE__
+	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY) {
+		if ((pthread_create_suspended_np(&id, &attr, (void *(*)(void *)) start, (void *) user_data) != 0)
+			fprintf(stderr, "pthread_create_suspended_np: failed\n");
+		tp = pthread_mach_thread_np(id);
+	} else
+#endif
+		if (pthread_create(&id, &attr, (void *(*)(void *)) start, (void *) user_data) != 0)
+			fprintf(stderr, "pthread_create: failed\n");
+	if (affinity != THREAD_NO_AFFINITY) {
+#if __linux__
+		cpu_set_t c;
+		CPU_ZERO(&c);
+		CPU_SET(id, &c);
+		pthread_setaffinity_np(id, sizeof c, &c);
+#elif __APPLE__
+		thread_affinity_policy_data_t a;
+		memset(&a, 0, sizeof a);
+		a.affinity_tag = affinity + 1;
+		if (thread_policy_set(tp, THREAD_AFFINITY_POLICY, (thread_policy_t) &a,
+				THREAD_AFFINITY_POLICY_COUNT) != 0)
+			fprintf(stderr, "thread_policy_set: THREAD_AFFINITY_POLICY failed\n");
+#endif
+	}
+#if __APPLE__
+	if (priority == THREAD_HIGH_PRIORITY) {
+		thread_extended_policy_data_t e;
+		memset(&e, 0, sizeof e);
+		e.timeshare = 0;
+		if (thread_policy_set(tp, THREAD_EXTENDED_POLICY, (thread_policy_t) &e,
+				THREAD_EXTENDED_POLICY_COUNT) != 0)
+			fprintf(stderr, "thread_policy_set: THREAD_EXTENDED_POLICY failed\n");
+	}
+	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY)
+		pthread_resume_np(id);
+#endif
 	pthread_attr_destroy(&attr);
 
 	return (thread_id_t) id;
@@ -156,9 +210,8 @@ void sema_acquire(sema_id_t id, unsigned count) {
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
-		while (sem_wait((sem_t *) id) < 0)
-			if (errno != EINTR)
-				abort();
+		if (sem_wait((sem_t *) id) < 0)
+			abort();
 #endif
 }
 

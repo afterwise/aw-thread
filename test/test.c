@@ -41,8 +41,8 @@ int main(int argc, char *argv[]) {
 	y.sema = s;
 	y.str = "thread #b";
 
-	a = thread_spawn(&tmain, THREAD_LOW_PRIORITY, 8192, (uintptr_t) &x);
-	b = thread_spawn(&tmain, THREAD_HIGH_PRIORITY, 8192, (uintptr_t) &y);
+	a = thread_spawn(&tmain, THREAD_LOW_PRIORITY, THREAD_NO_AFFINITY, 8192, (uintptr_t) &x);
+	b = thread_spawn(&tmain, THREAD_HIGH_PRIORITY, 1, 8192, (uintptr_t) &y);
 
 	sema_release(s, 2);
 

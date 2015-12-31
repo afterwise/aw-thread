@@ -40,6 +40,8 @@ enum thread_priority {
 	THREAD_LOW_PRIORITY = 2
 };
 
+#define THREAD_NO_AFFINITY (-1)
+
 #if __CELLOS_LV2__
 typedef unsigned long long thread_id_t;
 #else
@@ -51,7 +53,7 @@ typedef uintptr_t sema_id_t;
 typedef void (thread_start_t)(uintptr_t user_data);
 
 thread_id_t thread_spawn(
-	thread_start_t *start, enum thread_priority priority,
+	thread_start_t *start, enum thread_priority priority, int affinity,
 	size_t stack_size, uintptr_t user_data);
 
 void thread_exit(void);
