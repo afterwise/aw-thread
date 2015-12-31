@@ -29,6 +29,7 @@
 # include <sys/synchronization.h>
 #elif __APPLE__
 # include <mach/mach_init.h>
+# include <mach/thread_act.h>
 # include <mach/thread_policy.h>
 # include <mach/semaphore.h>
 # include <mach/task.h>
@@ -98,7 +99,7 @@ thread_id_t thread_spawn(
 		pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
 #if __APPLE__
 	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY) {
-		if ((pthread_create_suspended_np(&id, &attr, (void *(*)(void *)) start, (void *) user_data) != 0)
+		if (pthread_create_suspended_np(&id, &attr, (void *(*)(void *)) start, (void *) user_data) != 0)
 			fprintf(stderr, "pthread_create_suspended_np: failed\n");
 		tp = pthread_mach_thread_np(id);
 	} else
@@ -130,7 +131,7 @@ thread_id_t thread_spawn(
 			fprintf(stderr, "thread_policy_set: THREAD_EXTENDED_POLICY failed\n");
 	}
 	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY)
-		pthread_resume_np(id);
+		thread_resume(tp);
 #endif
 	pthread_attr_destroy(&attr);
 
