@@ -1,5 +1,5 @@
 
-#include "aw-once.h"
+#include "aw-atomic.h"
 #include "aw-thread.h"
 #include <stdio.h>
 
@@ -8,15 +8,15 @@ struct tdata {
 	const char *str;
 };
 
-static once_tag_t tag;
+static int nonce;
 
 void tmain(uintptr_t data) {
 	struct tdata *tdata = (struct tdata *) data;
 	int uno = 0;
 
-	if (once_start(&tag)) {
+	if (once_init(&nonce)) {
 		uno = 1;
-		once_finalize(&tag);
+		once_end(&nonce);
 	}
 
 	sema_acquire(tdata->sema, 1);

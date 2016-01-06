@@ -24,8 +24,21 @@
 #ifndef AW_ATOMIC_H
 #define AW_ATOMIC_H
 
+#if _MSC_VER
+# include <intrin.h>
+#else
+# include <stdbool.h>
+#endif
+
+#if __GNUC__
+# define _atomic_alwaysinline inline __attribute__((always_inline))
+#elif _MSC_VER
+# define _atomic_alwaysinline __forceinline
+#endif
+
 #if __GNUC__
 # define _compareandswap(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
+# define _barrier() do { asm volatile ("" : : : "memory"); } while (0)
 # if __x86_64__ || __i386__
 #  define _rbarrier() do { asm volatile ("lfence" : : : "memory"); } while (0)
 #  define _wbarrier() do { asm volatile ("sfence" : : : "memory"); } while (0)
@@ -41,12 +54,41 @@
 # endif
 #elif _MSC_VER
 # define _compareandswap(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
+# define _barrier() do { _ReadWriteBarrier(); }
 # if _M_IX86 || _M_X64
 #  define _rbarrier() do { _mm_lfence(); } while (0)
 #  define _wbarrier() do { _mm_sfence(); } while (0)
 #  define _rwbarrier() do { _mm_mfence(); } while (0)
 # endif
 #endif
+
+static _atomic_alwaysinline bool once_init(int *nonce) {
+	if (_compareandswap(nonce, 0, 1) != 0) {
+		do ; while (*(volatile int *) nonce != 2);
+		_rbarrier();
+		return false;
+	}
+
+	return true;
+}
+
+static _atomic_alwaysinline void once_end(int *nonce) {
+	_wbarrier();
+	*nonce = 2;
+}
+
+static _atomic_alwaysinline void spin_lock(int *lock) {
+	do ; while (_compareandswap(lock, 0, 1) != 0);
+}
+
+static _atomic_alwaysinline bool spin_trylock(int *lock) {
+	return _compareandswap(lock, 0, 1) == 0;
+}
+
+static _atomic_alwaysinline void spin_unlock(int *lock) {
+	_barrier();
+	*lock = 0;
+}
 
 #ifdef __cplusplus
 } /* extern "C" */
