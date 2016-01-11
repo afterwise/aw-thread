@@ -22,7 +22,6 @@
  */
 
 #include "aw-thread.h"
-#include <stdio.h>
 
 #if __CELLOS_LV2__
 # include <sys/ppu_thread.h>
@@ -39,8 +38,11 @@
 
 #if __APPLE__ || __linux__
 # include <pthread.h>
+# include <sched.h>
 # include <unistd.h>
 #endif
+
+#include <stdio.h>
 
 #if __APPLE__
 /* from mach/thread_policy.h */
@@ -158,6 +160,16 @@ void thread_join(thread_id_t id) {
 #elif __linux__ || __APPLE__
 	void *res;
 	pthread_join((pthread_t) id, &res);
+#endif
+}
+
+void thread_yield(void) {
+#if _WIN32
+	SwitchToThread();
+#elif __CELLOS_LV2__
+	sys_ppu_thread_yield();
+#elif __linux__ || __APPLE__
+	sched_yield();
 #endif
 }
 

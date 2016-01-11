@@ -59,6 +59,8 @@ thread_id_t thread_spawn(
 void thread_exit(void);
 void thread_join(thread_id_t id);
 
+void thread_yield(void);
+
 sema_id_t sema_create(void);
 void sema_destroy(sema_id_t id);
 

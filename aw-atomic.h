@@ -24,9 +24,13 @@
 #ifndef AW_ATOMIC_H
 #define AW_ATOMIC_H
 
+#include "aw-thread.h"
+
 #if _MSC_VER
 # include <intrin.h>
-#else
+#endif
+
+#if !_MSC_VER || _MSC_VER >= 1800
 # include <stdbool.h>
 #endif
 
@@ -34,6 +38,10 @@
 # define _atomic_alwaysinline inline __attribute__((always_inline))
 #elif _MSC_VER
 # define _atomic_alwaysinline __forceinline
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 #if __GNUC__
@@ -63,10 +71,15 @@
 #endif
 
 static _atomic_alwaysinline bool once_init(int *nonce) {
-	if (_compareandswap(nonce, 0, 1) != 0) {
-		do ; while (*(volatile int *) nonce != 2);
-		_rbarrier();
-		return false;
+	switch (_compareandswap(nonce, 0, 1)) {
+	case 1:
+		for (;; thread_yield())
+			for (int i = 0; i < 1024; ++i)
+				if (*(volatile int *) nonce == 2) {
+	case 2:
+					_rbarrier();
+					return false;
+				}
 	}
 
 	return true;
@@ -77,12 +90,15 @@ static _atomic_alwaysinline void once_end(int *nonce) {
 	*nonce = 2;
 }
 
-static _atomic_alwaysinline void spin_lock(int *lock) {
-	do ; while (_compareandswap(lock, 0, 1) != 0);
-}
-
 static _atomic_alwaysinline bool spin_trylock(int *lock) {
 	return _compareandswap(lock, 0, 1) == 0;
+}
+
+static _atomic_alwaysinline void spin_lock(int *lock) {
+	for (;; thread_yield())
+		for (int i = 0; i < 1024; ++i)
+			if (spin_trylock(lock))
+				return;
 }
 
 static _atomic_alwaysinline void spin_unlock(int *lock) {
