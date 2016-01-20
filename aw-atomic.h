@@ -72,12 +72,14 @@ extern "C" {
 # endif
 #endif
 
-static _atomic_alwaysinline bool once_init(int *nonce) {
+typedef int nonce_t;
+
+static _atomic_alwaysinline bool once_init(nonce_t *nonce) {
 	switch (_compareandswap32(nonce, 0, 1)) {
 	case 1:
 		for (;; thread_yield())
 			for (int i = 0; i < 1024; ++i)
-				if (*(volatile int *) nonce == 2) {
+				if (*(volatile nonce_t *) nonce == 2) {
 	case 2:
 					_rbarrier();
 					return false;
@@ -87,23 +89,25 @@ static _atomic_alwaysinline bool once_init(int *nonce) {
 	return true;
 }
 
-static _atomic_alwaysinline void once_end(int *nonce) {
+static _atomic_alwaysinline void once_end(nonce_t *nonce) {
 	_wbarrier();
 	*nonce = 2;
 }
 
-static _atomic_alwaysinline bool spin_trylock(int *lock) {
+typedef int spin_t;
+
+static _atomic_alwaysinline bool spin_trylock(spin_t *lock) {
 	return _compareandswap32(lock, 0, 1) == 0;
 }
 
-static _atomic_alwaysinline void spin_lock(int *lock) {
+static _atomic_alwaysinline void spin_lock(spin_t *lock) {
 	for (;; thread_yield())
 		for (int i = 0; i < 1024; ++i)
 			if (spin_trylock(lock))
 				return;
 }
 
-static _atomic_alwaysinline void spin_unlock(int *lock) {
+static _atomic_alwaysinline void spin_unlock(spin_t *lock) {
 	_barrier();
 	*lock = 0;
 }
