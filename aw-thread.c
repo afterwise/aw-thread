@@ -55,6 +55,18 @@ kern_return_t thread_policy_get(
 	boolean_t *get_default);
 #endif
 
+int thread_hardware_concurrency() {
+#if _WIN32
+	SYSTEM_INFO si;
+	GetSystemInfo(&si);
+	return sysinfo.dwNumberOfProcessors;
+#elif __CELLOS_LV2__
+	return 2;
+#elif __linux__ || __APPLE__
+	return sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+}
+
 thread_id_t thread_spawn(
 		thread_start_t *start, enum thread_priority priority, int affinity,
 		size_t stack_size, uintptr_t user_data) {

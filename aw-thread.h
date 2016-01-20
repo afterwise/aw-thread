@@ -52,6 +52,8 @@ typedef uintptr_t sema_id_t;
 
 typedef void (thread_start_t)(uintptr_t user_data);
 
+int thread_hardware_concurrency();
+
 thread_id_t thread_spawn(
 	thread_start_t *start, enum thread_priority priority, int affinity,
 	size_t stack_size, uintptr_t user_data);
