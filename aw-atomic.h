@@ -57,7 +57,7 @@ extern "C" {
 #  define _wbarrier() do { asm volatile ("eieio" : : : "memory"); } while (0)
 #  define _rwbarrier() do { asm volatile ("sync" : : : "memory"); } while (0)
 # elif __arm__
-#  define _rbarrier() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
+#  define _rbarrier() do { asm volatile ("dmb ishld" : : : "memory"); } while (0)
 #  define _wbarrier() do { asm volatile ("dmb ishst" : : : "memory"); } while (0)
 #  define _rwbarrier() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
 # endif
