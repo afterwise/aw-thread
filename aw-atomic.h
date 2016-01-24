@@ -57,7 +57,7 @@ extern "C" {
 #  define _wbarrier() do { asm volatile ("eieio" : : : "memory"); } while (0)
 #  define _rwbarrier() do { asm volatile ("sync" : : : "memory"); } while (0)
 # elif __arm__
-#  define _rbarrier() do { asm volatile ("dmb ishld" : : : "memory"); } while (0)
+#  define _rbarrier() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _wbarrier() do { asm volatile ("dmb ishst" : : : "memory"); } while (0)
 #  define _rwbarrier() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
 # endif
@@ -80,10 +80,12 @@ static _atomic_alwaysinline bool once_init(nonce_t *nonce) {
 		for (;; thread_yield())
 			for (int i = 0; i < 1024; ++i)
 				if (*(volatile nonce_t *) nonce == 2) {
-	case 2:
 					_rbarrier();
 					return false;
 				}
+	case 2:
+		_rbarrier();
+		return false;
 	}
 
 	return true;
