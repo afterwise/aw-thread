@@ -1,6 +1,6 @@
 
 /*
-   Copyright (c) 2014 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2016 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,10 +24,10 @@
 #ifndef AW_ATOMIC_H
 #define AW_ATOMIC_H
 
-#include "aw-thread.h"
-
 #if _MSC_VER
 # include <intrin.h>
+#elif defined __i386__ || defined __x86_64__
+# include <xmmintrin.h>
 #endif
 
 #if !_MSC_VER || _MSC_VER >= 1800
@@ -52,77 +52,76 @@
 # define _atomic_restrict __restrict
 #endif
 
-#ifdef RL_TEST
-# define _atomic_var(type) rl::atomic<type>
-# define _atomic_load(var) var.load(rl::memory_order_relaxed)
-# define _atomic_store(var,val) var.store(val, rl::memory_order_relaxed)
-# define _atomic_rbarrier() rl::atomic_thread_fence(rl::memory_order_acquire)
-# define _atomic_wbarrier() rl::atomic_thread_fence(rl::memory_order_release)
-#else
-# define _atomic_var(type) type
-# define _atomic_load(var) (var)
-# define _atomic_store(var,val) (var = (val))
-# define _atomic_rbarrier() _rbarrier()
-# define _atomic_wbarrier() _wbarrier()
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #if __GNUC__
-# define _compareandswap32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
-# define _compareandswap64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
-# define _barrier() do { asm volatile ("" : : : "memory"); } while (0)
-# if __x86_64__ || __i386__
-#  define _rbarrier() do { asm volatile ("lfence" : : : "memory"); } while (0)
-#  define _wbarrier() do { asm volatile ("sfence" : : : "memory"); } while (0)
-#  define _rwbarrier() do { asm volatile ("mfence" : : : "memory"); } while (0)
+# define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
+# define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
+# define _atomic_barrier() do { asm volatile ("" : : : "memory"); } while (0)
+# if __i386__ || __x86_64__
+#  define _atomic_acquire() do { asm volatile ("lfence" : : : "memory"); } while (0)
+#  define _atomic_release() do { asm volatile ("sfence" : : : "memory"); } while (0)
+#  define _atomic_fence() do { asm volatile ("mfence" : : : "memory"); } while (0)
+#  define _atomic_yield() do { _mm_pause(); } while (0)
 # elif __PPU__ || __ppc64__
-#  define _rbarrier() do { asm volatile ("sync 1" : : : "memory"); } while (0)
-#  define _wbarrier() do { asm volatile ("eieio" : : : "memory"); } while (0)
-#  define _rwbarrier() do { asm volatile ("sync" : : : "memory"); } while (0)
-# elif __arm__
-#  define _rbarrier() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
-#  define _wbarrier() do { asm volatile ("dmb ishst" : : : "memory"); } while (0)
-#  define _rwbarrier() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
+#  define _atomic_acquire() do { asm volatile ("sync 1" : : : "memory"); } while (0)
+#  define _atomic_release() do { asm volatile ("eieio" : : : "memory"); } while (0)
+#  define _atomic_fence() do { asm volatile ("sync" : : : "memory"); } while (0)
+#  define _atomic_yield() do { asm volatile ("or 27,27,27"); } while (0)
+# elif __arm__ || __arm64__ || __aarch64__
+#  define _atomic_acquire() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
+#  define _atomic_release() do { asm volatile ("dmb ishst" : : : "memory"); } while (0)
+#  define _atomic_fence() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
+#  define _atomic_yield() do { asm volatile ("yield"); } while (0)
 # endif
 #elif _MSC_VER
-# define _compareandswap32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
-# define _compareandswap64(ptr,cmp,val) (_InterlockedCompareExchange64((ptr), (val), (cmp)))
-# define _barrier() do { _ReadWriteBarrier(); }
+# define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
+# define _atomic_cas64(ptr,cmp,val) (_InterlockedCompareExchange64((ptr), (val), (cmp)))
+# define _atomic_barrier() do { _ReadWriteBarrier(); }
 # if _M_IX86 || _M_X64
-#  define _rbarrier() do { _mm_lfence(); } while (0)
-#  define _wbarrier() do { _mm_sfence(); } while (0)
-#  define _rwbarrier() do { _mm_mfence(); } while (0)
+#  define _atomic_acquire() do { _mm_lfence(); } while (0)
+#  define _atomic_release() do { _mm_sfence(); } while (0)
+#  define _atomic_fence() do { _mm_mfence(); } while (0)
+#  define _atomic_yield() do { __yield(); } while (0)
 # endif
+#endif
+
+#ifdef RL_TEST
+# define _atomic_var(type) rl::atomic<type>
+# define _atomic_load(var) var.load(rl::memory_order_relaxed)
+# define _atomic_store(var,val) var.store(val, rl::memory_order_relaxed)
+# undef _atomic_acquire
+# undef _atomic_release
+# define _atomic_acquire() rl::atomic_thread_fence(rl::memory_order_acquire)
+# define _atomic_release() rl::atomic_thread_fence(rl::memory_order_release)
+#else
+# define _atomic_var(type) type
+# define _atomic_load(var) (var)
+# define _atomic_store(var,val) (var = (val))
 #endif
 
 /*
    Once, e.g. safely lazy-create singletons shared by multiple threads.
  */
 
-typedef int once_t;
+typedef int atomic_once_t;
 
-_atomic_alwaysinline bool once_init(once_t *once) {
-	switch (_compareandswap32(once, 0, 1)) {
+_atomic_alwaysinline bool atomic_once_init(atomic_once_t *once) {
+	switch (_atomic_cas32(once, 0, 1)) {
 	case 1:
-		for (;; thread_yield())
-			for (int i = 0; i < 1024; ++i)
-				if (*(volatile once_t *) once == 2) {
-					_rbarrier();
-					return false;
-				}
+		do _atomic_yield();
+		while (*(volatile atomic_once_t *) once != 2);
 	case 2:
-		_rbarrier();
+		_atomic_acquire();
 		return false;
 	}
-
 	return true;
 }
 
-_atomic_alwaysinline void once_end(once_t *once) {
-	_wbarrier();
+_atomic_alwaysinline void atomic_once_end(atomic_once_t *once) {
+	_atomic_release();
 	*once = 2;
 }
 
@@ -130,22 +129,24 @@ _atomic_alwaysinline void once_end(once_t *once) {
    Spinlock implementation.
  */
 
-typedef int spin_t;
+typedef int atomic_spin_t;
 
-_atomic_alwaysinline bool spin_trylock(spin_t *lock) {
-	return _compareandswap32(lock, 0, 1) == 0;
+_atomic_alwaysinline bool atomic_trylock(atomic_spin_t *spin) {
+	if (_atomic_cas32(spin, 0, 1) == 0) {
+		_atomic_acquire();
+		return true;
+	}
+	return false;
 }
 
-_atomic_alwaysinline void spin_lock(spin_t *lock) {
-	for (;; thread_yield())
-		for (int i = 0; i < 1024; ++i)
-			if (spin_trylock(lock))
-				return;
+_atomic_alwaysinline void atomic_lock(atomic_spin_t *spin) {
+	while (!atomic_trylock(spin))
+		_atomic_yield();
 }
 
-_atomic_alwaysinline void spin_unlock(spin_t *lock) {
-	_barrier();
-	*lock = 0;
+_atomic_alwaysinline void atomic_spin_unlock(atomic_spin_t *spin) {
+	_atomic_release();
+	*spin = 0;
 }
 
 /*
@@ -185,13 +186,13 @@ void _atomic_write(struct atomic_ring *_atomic_restrict ring, size_t w, const vo
 	const size_t l = _atomic_min(n, ring->size - w);
 	if (l > 0) _atomic_memcpy((char *) ring->base + w, p, l);
 	if (n - l > 0) _atomic_memcpy(ring->base, (const char *) p + l, n - l);
-	_atomic_wbarrier();
+	_atomic_release();
 	_atomic_store(ring->write, (w + n) & (ring->size - 1));
 }
 
 _atomic_alwaysinline
 bool atomic_dequeue(struct atomic_ring *_atomic_restrict ring, void *p, size_t n) {
-	_atomic_rbarrier();
+	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
 	const size_t x = (w < r ? w + ring->size : w);
 	return (n <= x - r) ? _atomic_read(ring, r, p, n), true : false;
@@ -206,7 +207,7 @@ bool atomic_enqueue(struct atomic_ring *_atomic_restrict ring, const void *p, si
 
 _atomic_alwaysinline
 size_t atomic_read(struct atomic_ring *_atomic_restrict ring, void *p, size_t n) {
-	_atomic_rbarrier();
+	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
 	const size_t x = (w < r ? w + ring->size : w);
 	const size_t k = _atomic_min(n, x - r);

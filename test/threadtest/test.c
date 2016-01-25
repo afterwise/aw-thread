@@ -8,15 +8,15 @@ struct tdata {
 	const char *str;
 };
 
-static int nonce;
+static atomic_once_t once;
 
 void tmain(uintptr_t data) {
 	struct tdata *tdata = (struct tdata *) data;
 	int uno = 0;
 
-	if (once_init(&nonce)) {
+	if (atomic_once_init(&once)) {
 		uno = 1;
-		once_end(&nonce);
+		atomic_once_end(&once);
 	}
 
 	sema_acquire(tdata->sema, 1);
