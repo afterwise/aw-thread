@@ -34,10 +34,36 @@
 # include <stdbool.h>
 #endif
 
+#ifndef _atomic_assert
+# include <assert.h>
+# define _atomic_assert assert
+#endif
+
+#ifndef _atomic_memcpy
+# include <string.h>
+# define _atomic_memcpy memcpy
+#endif
+
 #if __GNUC__
-# define _atomic_alwaysinline inline __attribute__((always_inline))
+# define _atomic_alwaysinline __attribute__((always_inline))
+# define _atomic_restrict __restrict__
 #elif _MSC_VER
 # define _atomic_alwaysinline __forceinline
+# define _atomic_restrict __restrict
+#endif
+
+#ifdef RL_TEST
+# define _atomic_var(type) rl::atomic<type>
+# define _atomic_load(var) var.load(rl::memory_order_relaxed)
+# define _atomic_store(var,val) var.store(val, rl::memory_order_relaxed)
+# define _atomic_rbarrier() rl::atomic_thread_fence(rl::memory_order_acquire)
+# define _atomic_wbarrier() rl::atomic_thread_fence(rl::memory_order_release)
+#else
+# define _atomic_var(type) type
+# define _atomic_load(var) (var)
+# define _atomic_store(var,val) (var = (val))
+# define _atomic_rbarrier() _rbarrier()
+# define _atomic_wbarrier() _wbarrier()
 #endif
 
 #ifdef __cplusplus
@@ -72,14 +98,18 @@ extern "C" {
 # endif
 #endif
 
-typedef int nonce_t;
+/*
+   Once, e.g. safely lazy-create singletons shared by multiple threads.
+ */
 
-static _atomic_alwaysinline bool once_init(nonce_t *nonce) {
-	switch (_compareandswap32(nonce, 0, 1)) {
+typedef int once_t;
+
+_atomic_alwaysinline bool once_init(once_t *once) {
+	switch (_compareandswap32(once, 0, 1)) {
 	case 1:
 		for (;; thread_yield())
 			for (int i = 0; i < 1024; ++i)
-				if (*(volatile nonce_t *) nonce == 2) {
+				if (*(volatile once_t *) once == 2) {
 					_rbarrier();
 					return false;
 				}
@@ -91,27 +121,104 @@ static _atomic_alwaysinline bool once_init(nonce_t *nonce) {
 	return true;
 }
 
-static _atomic_alwaysinline void once_end(nonce_t *nonce) {
+_atomic_alwaysinline void once_end(once_t *once) {
 	_wbarrier();
-	*nonce = 2;
+	*once = 2;
 }
+
+/*
+   Spinlock implementation.
+ */
 
 typedef int spin_t;
 
-static _atomic_alwaysinline bool spin_trylock(spin_t *lock) {
+_atomic_alwaysinline bool spin_trylock(spin_t *lock) {
 	return _compareandswap32(lock, 0, 1) == 0;
 }
 
-static _atomic_alwaysinline void spin_lock(spin_t *lock) {
+_atomic_alwaysinline void spin_lock(spin_t *lock) {
 	for (;; thread_yield())
 		for (int i = 0; i < 1024; ++i)
 			if (spin_trylock(lock))
 				return;
 }
 
-static _atomic_alwaysinline void spin_unlock(spin_t *lock) {
+_atomic_alwaysinline void spin_unlock(spin_t *lock) {
 	_barrier();
 	*lock = 0;
+}
+
+/*
+   Single-producer, single-consumer lockless ring buffer. Wrap the
+   read and write functions with one or two spin locks for 1-to-N
+   or N-to-M respectively.
+ */
+
+struct atomic_ring {
+	void *base;
+	size_t size;
+	_atomic_var(size_t) read;
+	_atomic_var(size_t) write;
+};
+
+_atomic_alwaysinline
+void atomic_ring_init(struct atomic_ring *ring, void *base, size_t size) {
+	_atomic_assert((size & (size - 1)) == 0);
+	ring->base = base;
+	ring->size = size;
+	_atomic_store(ring->read, 0);
+	_atomic_store(ring->write, 0);
+}
+
+_atomic_alwaysinline size_t _atomic_min(size_t a, size_t b) { return a < b ? a : b; }
+
+_atomic_alwaysinline
+void _atomic_read(struct atomic_ring *_atomic_restrict ring, size_t r, void *p, size_t n) {
+	const size_t l = _atomic_min(n, ring->size - r);
+	if (l > 0) _atomic_memcpy(p, (const char *) ring->base + r, l);
+	if (n - l > 0) _atomic_memcpy((char *) p + l, ring->base, n - l);
+	_atomic_store(ring->read, (r + n) & (ring->size - 1));
+}
+
+_atomic_alwaysinline
+void _atomic_write(struct atomic_ring *_atomic_restrict ring, size_t w, const void *p, size_t n) {
+	const size_t l = _atomic_min(n, ring->size - w);
+	if (l > 0) _atomic_memcpy((char *) ring->base + w, p, l);
+	if (n - l > 0) _atomic_memcpy(ring->base, (const char *) p + l, n - l);
+	_atomic_wbarrier();
+	_atomic_store(ring->write, (w + n) & (ring->size - 1));
+}
+
+_atomic_alwaysinline
+bool atomic_dequeue(struct atomic_ring *_atomic_restrict ring, void *p, size_t n) {
+	_atomic_rbarrier();
+	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
+	const size_t x = (w < r ? w + ring->size : w);
+	return (n <= x - r) ? _atomic_read(ring, r, p, n), true : false;
+}
+
+_atomic_alwaysinline
+bool atomic_enqueue(struct atomic_ring *_atomic_restrict ring, const void *p, size_t n) {
+	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
+	const size_t x = (r <= w ? r + ring->size : r);
+	return (n <= x - (w + 1)) ? _atomic_write(ring, w, p, n), true : false;
+}
+
+_atomic_alwaysinline
+size_t atomic_read(struct atomic_ring *_atomic_restrict ring, void *p, size_t n) {
+	_atomic_rbarrier();
+	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
+	const size_t x = (w < r ? w + ring->size : w);
+	const size_t k = _atomic_min(n, x - r);
+	return _atomic_read(ring, r, p, k), k;
+}
+
+_atomic_alwaysinline
+size_t atomic_write(struct atomic_ring *_atomic_restrict ring, const void *p, size_t n) {
+	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
+	const size_t x = (r <= w ? r + ring->size : r);
+	const size_t k = _atomic_min(n, x - (w + 1));
+	return _atomic_write(ring, w, p, k), k;
 }
 
 #ifdef __cplusplus
