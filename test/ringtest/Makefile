@@ -3,10 +3,10 @@
 export CFLAGS += -Wno-inline-new-delete -Wno-undefined-bool-conversion -Wno-deprecated-declarations
 
 test: test.o ../../libaw-thread.a
-	$(CC) $(LDFLAGS) -lc++ -o $@ $^
+	$(CXX) $(LDFLAGS) -o $@ $^
 
 %.o: %.cpp relacy
-	$(CC) $(CFLAGS) -I../.. -Irelacy -include relacy/relacy.hpp -c $< -o $@
+	$(CXX) $(CFLAGS) -I../.. -Irelacy -include relacy/relacy.hpp -c $< -o $@
 
 ../../libaw-thread.a:
 	$(MAKE) -C../..
