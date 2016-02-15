@@ -26,6 +26,7 @@
 #  define WIN32_LEAN_AND_MEAN 1
 # elif __linux__
 #  define _BSD_SOURCE 1
+#  define _GNU_SOURCE 1
 #  define _DEFAULT_SOURCE 1
 #  define _POSIX_C_SOURCE 200809L
 #  define _SVID_SOURCE 1
@@ -50,12 +51,14 @@
 # endif
 
 #if __APPLE__ || __linux__
+# include <errno.h>
 # include <pthread.h>
 # include <sched.h>
 # include <unistd.h>
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #if __APPLE__
 /* from mach/thread_policy.h */
@@ -110,6 +113,7 @@ thread_id_t thread_spawn(
 	pthread_attr_t attr;
 	struct sched_param param;
 	int pritab[3];
+	int err;
 
 	pritab[0] = sched_get_priority_min(SCHED_FIFO);
 	pritab[2] = sched_get_priority_max(SCHED_FIFO);
@@ -119,20 +123,22 @@ thread_id_t thread_spawn(
 
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stack_size);
+#if __APPLE__
 	pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+#endif
 	pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 	pthread_attr_setschedparam(&attr, &param);
 	if (priority == THREAD_HIGH_PRIORITY)
 		pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
 #if __APPLE__
 	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY) {
-		if (pthread_create_suspended_np(&id, &attr, (void *(*)(void *)) start, (void *) user_data) != 0)
-			fprintf(stderr, "pthread_create_suspended_np: failed\n");
+		if ((err = pthread_create_suspended_np(&id, &attr, (void *(*)(void *)) start, (void *) user_data)) != 0)
+			errno = err, perror("pthread_create_suspended_np");
 		tp = pthread_mach_thread_np(id);
 	} else
 #endif
-		if (pthread_create(&id, &attr, (void *(*)(void *)) start, (void *) user_data) != 0)
-			fprintf(stderr, "pthread_create: failed\n");
+		if ((err = pthread_create(&id, &attr, (void *(*)(void *)) start, (void *) user_data)) != 0)
+			errno = err, perror("pthread_create");
 	if (affinity != THREAD_NO_AFFINITY) {
 #if __linux__
 		cpu_set_t c;
@@ -145,7 +151,7 @@ thread_id_t thread_spawn(
 		a.affinity_tag = affinity + 1;
 		if (thread_policy_set(tp, THREAD_AFFINITY_POLICY, (thread_policy_t) &a,
 				THREAD_AFFINITY_POLICY_COUNT) != 0)
-			fprintf(stderr, "thread_policy_set: THREAD_AFFINITY_POLICY failed\n");
+			fprintf(stderr, "thread_policy_set: failed\n");
 #endif
 	}
 #if __APPLE__
@@ -155,7 +161,7 @@ thread_id_t thread_spawn(
 		e.timeshare = 0;
 		if (thread_policy_set(tp, THREAD_EXTENDED_POLICY, (thread_policy_t) &e,
 				THREAD_EXTENDED_POLICY_COUNT) != 0)
-			fprintf(stderr, "thread_policy_set: THREAD_EXTENDED_POLICY failed\n");
+			fprintf(stderr, "thread_policy_set: failed\n");
 	}
 	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY)
 		thread_resume(tp);
