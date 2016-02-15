@@ -57,22 +57,22 @@ extern "C" {
 #if __GNUC__
 # define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
-# define _atomic_barrier() do { asm volatile ("" : : : "memory"); } while (0)
+# define _atomic_barrier() do { __asm__ volatile ("" : : : "memory"); } while (0)
 # if __i386__ || __x86_64__
-#  define _atomic_acquire() do { asm volatile ("lfence" : : : "memory"); } while (0)
-#  define _atomic_release() do { asm volatile ("sfence" : : : "memory"); } while (0)
-#  define _atomic_fence() do { asm volatile ("mfence" : : : "memory"); } while (0)
+#  define _atomic_acquire() do { __asm__ volatile ("lfence" : : : "memory"); } while (0)
+#  define _atomic_release() do { __asm__ volatile ("sfence" : : : "memory"); } while (0)
+#  define _atomic_fence() do { __asm__ volatile ("mfence" : : : "memory"); } while (0)
 #  define _atomic_yield() do { _mm_pause(); } while (0)
 # elif __PPU__ || __ppc64__
-#  define _atomic_acquire() do { asm volatile ("sync 1" : : : "memory"); } while (0)
-#  define _atomic_release() do { asm volatile ("eieio" : : : "memory"); } while (0)
-#  define _atomic_fence() do { asm volatile ("sync" : : : "memory"); } while (0)
-#  define _atomic_yield() do { asm volatile ("or 27,27,27"); } while (0)
+#  define _atomic_acquire() do { __asm__ volatile ("sync 1" : : : "memory"); } while (0)
+#  define _atomic_release() do { __asm__ volatile ("eieio" : : : "memory"); } while (0)
+#  define _atomic_fence() do { __asm__ volatile ("sync" : : : "memory"); } while (0)
+#  define _atomic_yield() do { __asm__ volatile ("or 27,27,27"); } while (0)
 # elif __arm__ || __arm64__ || __aarch64__
-#  define _atomic_acquire() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
-#  define _atomic_release() do { asm volatile ("dmb ishst" : : : "memory"); } while (0)
-#  define _atomic_fence() do { asm volatile ("dmb ish" : : : "memory"); } while (0)
-#  define _atomic_yield() do { asm volatile ("yield"); } while (0)
+#  define _atomic_acquire() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
+#  define _atomic_release() do { __asm__ volatile ("dmb ishst" : : : "memory"); } while (0)
+#  define _atomic_fence() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
+#  define _atomic_yield() do { __asm__ volatile ("yield"); } while (0)
 # endif
 #elif _MSC_VER
 # define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
