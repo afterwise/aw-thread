@@ -5,7 +5,7 @@
 
 struct tdata {
 	sema_id_t sema;
-	const char *str;
+	char *str;
 };
 
 static atomic_once_t once;
@@ -26,31 +26,31 @@ void tmain(uintptr_t data) {
 }
 
 int main(int argc, char *argv[]) {
-	thread_id_t a, b;
-	sema_id_t s;
-	struct tdata x, y;
-
 	(void) argc;
 	(void) argv;
 
-	s = sema_create();
+	sema_id_t s = sema_create();
+	int n = thread_hardware_concurrency();
+	struct tdata x[n];
 
-	x.sema = s;
-	x.str = "thread #a";
+	for (int i = 0; i < n; ++i) {
+		x[i].sema = s;
+		x[i].str = malloc(64);
+		snprintf(x[i].str, 64, "thread#%c", 'A' + i);
+	}
 
-	y.sema = s;
-	y.str = "thread #b";
+	thread_id_t y[n];
+	for (int i = 0; i < n; ++i)
+		y[i] = thread_spawn(&tmain, THREAD_LOW_PRIORITY, THREAD_NO_AFFINITY, 8192, (uintptr_t) &x[i]);
 
-	a = thread_spawn(&tmain, THREAD_LOW_PRIORITY, THREAD_NO_AFFINITY, 8192, (uintptr_t) &x);
-	b = thread_spawn(&tmain, THREAD_HIGH_PRIORITY, 1, 8192, (uintptr_t) &y);
+	sema_release(s, n);
 
-	sema_release(s, 2);
-
-	thread_join(b);
-	thread_join(a);
+	for (int i = 0; i < n; ++i)
+		thread_join(y[i]);
 
 	sema_destroy(s);
 
+	printf("OK\n");
 	return 0;
 }
 
