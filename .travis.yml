@@ -1,0 +1,19 @@
+language: c
+matrix:
+  include:
+  - compiler: clang
+    env: CFLAGS=-coverage LDFLAGS=-coverage
+    os: osx
+  - compiler: gcc
+    env: CFLAGS="-fprofile-arcs -ftest-coverage" LDFLAGS=-fprofile-arcs
+    os: linux
+script:
+  - make -C test/threadtest && ./test/threadtest/test
+  - make -C test/ringtest  && ./test/ringtest/test
+sudo: required
+before_install:
+  - sudo pip install codecov
+install: true
+after_success:
+  - ( cd test && codecov )
+

@@ -1,6 +1,6 @@
 
 /*
-   Copyright (c) 2014 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2016 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +20,19 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
    THE SOFTWARE.
  */
+
+#ifndef _nofeatures
+# if _WIN32
+#  define WIN32_LEAN_AND_MEAN 1
+# elif __linux__
+#  define _BSD_SOURCE 1
+#  define _DEFAULT_SOURCE 1
+#  define _POSIX_C_SOURCE 200809L
+#  define _SVID_SOURCE 1
+# elif __APPLE__
+#  define _DARWIN_C_SOURCE 1
+# endif
+#endif /* _nofeatures */
 
 #include "aw-thread.h"
 
