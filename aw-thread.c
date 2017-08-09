@@ -37,6 +37,10 @@
 
 #include "aw-thread.h"
 
+#if _WIN32
+# include <windows.h>
+#endif
+
 #if __CELLOS_LV2__
 # include <sys/ppu_thread.h>
 # include <sys/synchronization.h>
@@ -75,7 +79,7 @@ int thread_hardware_concurrency() {
 #if _WIN32
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
-	return sysinfo.dwNumberOfProcessors;
+	return si.dwNumberOfProcessors;
 #elif __CELLOS_LV2__
 	return 2;
 #elif __linux__ || __APPLE__
