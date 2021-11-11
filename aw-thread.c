@@ -1,6 +1,6 @@
 
 /*
-   Copyright (c) 2014-2016 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2021 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@
    THE SOFTWARE.
  */
 
-#ifndef _nofeatures
+#ifndef _thread_nofeatures
 # if _WIN32
 #  define WIN32_LEAN_AND_MEAN 1
 # elif __linux__
@@ -37,7 +37,9 @@
 
 #include "aw-thread.h"
 
-#if __CELLOS_LV2__
+#if _WIN32
+# include <windows.h>
+#elif __CELLOS_LV2__
 # include <sys/ppu_thread.h>
 # include <sys/synchronization.h>
 #elif __APPLE__
@@ -75,7 +77,7 @@ int thread_hardware_concurrency() {
 #if _WIN32
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
-	return sysinfo.dwNumberOfProcessors;
+	return si.dwNumberOfProcessors;
 #elif __CELLOS_LV2__
 	return 2;
 #elif __linux__ || __APPLE__
@@ -93,7 +95,7 @@ thread_id_t thread_spawn(
 
 	SetThreadPriority(id, 1 - priority);
 	if (affinity != THREAD_NO_AFFINITY)
-		SetThreadAffinityMask(id, 1 << affinity);
+		SetThreadAffinityMask(id, (DWORD_PTR) 1 << affinity);
 	ResumeThread(id);
 
 	return (thread_id_t) id;

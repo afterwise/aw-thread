@@ -1,6 +1,6 @@
 
 /*
-   Copyright (c) 2014-2016 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2021 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -45,7 +45,7 @@
 #endif
 
 #if __GNUC__
-# define _atomic_alwaysinline __attribute__((always_inline))
+# define _atomic_alwaysinline inline __attribute__((always_inline))
 #elif _MSC_VER
 # define _atomic_alwaysinline __forceinline
 #endif
@@ -78,12 +78,10 @@ extern "C" {
 # define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
 # define _atomic_cas64(ptr,cmp,val) (_InterlockedCompareExchange64((ptr), (val), (cmp)))
 # define _atomic_barrier() do { _ReadWriteBarrier(); }
-# if _M_IX86 || _M_X64
-#  define _atomic_acquire() do { _mm_lfence(); } while (0)
-#  define _atomic_release() do { _mm_sfence(); } while (0)
-#  define _atomic_fence() do { _mm_mfence(); } while (0)
-#  define _atomic_yield() do { __yield(); } while (0)
-# endif
+# define _atomic_acquire() do { _mm_lfence(); } while (0)
+# define _atomic_release() do { _mm_sfence(); } while (0)
+# define _atomic_fence() do { _mm_mfence(); } while (0)
+# define _atomic_yield() do { _mm_pause(); } while (0)
 #endif
 
 #ifdef RL_TEST
@@ -104,10 +102,14 @@ extern "C" {
    Once, e.g. safely lazy-create singletons shared by multiple threads.
  */
 
+#if _MSC_VER
+typedef long atomic_once_t;
+#else
 typedef int atomic_once_t;
+#endif
 
 _atomic_alwaysinline
-static inline bool atomic_once_init(atomic_once_t *once) {
+static bool atomic_once_init(atomic_once_t *once) {
 	switch (_atomic_cas32(once, 0, 1)) {
 	case 1:
 		do _atomic_yield();
@@ -120,7 +122,7 @@ static inline bool atomic_once_init(atomic_once_t *once) {
 }
 
 _atomic_alwaysinline
-static inline void atomic_once_end(atomic_once_t *once) {
+static void atomic_once_end(atomic_once_t *once) {
 	_atomic_release();
 	*once = 2;
 }
@@ -129,10 +131,14 @@ static inline void atomic_once_end(atomic_once_t *once) {
    Spinlock implementation.
  */
 
+#if _MSC_VER
+typedef long atomic_spin_t;
+#else
 typedef int atomic_spin_t;
+#endif
 
 _atomic_alwaysinline
-static inline bool atomic_trylock(atomic_spin_t *spin) {
+static bool atomic_trylock(atomic_spin_t *spin) {
 	if (_atomic_cas32(spin, 0, 1) == 0) {
 		_atomic_acquire();
 		return true;
@@ -141,13 +147,13 @@ static inline bool atomic_trylock(atomic_spin_t *spin) {
 }
 
 _atomic_alwaysinline
-static inline void atomic_lock(atomic_spin_t *spin) {
+static void atomic_lock(atomic_spin_t *spin) {
 	while (!atomic_trylock(spin))
 		_atomic_yield();
 }
 
 _atomic_alwaysinline
-static inline void atomic_spin_unlock(atomic_spin_t *spin) {
+static void atomic_spin_unlock(atomic_spin_t *spin) {
 	_atomic_release();
 	*spin = 0;
 }
@@ -166,7 +172,7 @@ struct atomic_ring {
 };
 
 _atomic_alwaysinline
-static inline void atomic_ring_init(struct atomic_ring *ring, void *base, size_t size) {
+static void atomic_ring_init(struct atomic_ring *ring, void *base, size_t size) {
 	_atomic_assert((size & (size - 1)) == 0);
 	ring->base = base;
 	ring->size = size;
@@ -175,10 +181,30 @@ static inline void atomic_ring_init(struct atomic_ring *ring, void *base, size_t
 }
 
 _atomic_alwaysinline
-static inline size_t _atomic_min(size_t a, size_t b) { return a < b ? a : b; }
+static size_t _atomic_min(size_t a, size_t b) { return a < b ? a : b; }
 
 _atomic_alwaysinline
-static inline void _atomic_read(struct atomic_ring *__restrict ring, size_t r, void *p, size_t n) {
+static size_t _atomic_write_end(const struct atomic_ring *__restrict ring, size_t r, size_t w) {
+	return (r <= w ? r + ring->size : r);
+}
+
+_atomic_alwaysinline
+static size_t _atomic_read_end(const struct atomic_ring *__restrict ring, size_t r, size_t w) {
+	return (w < r ? w + ring->size : w);
+}
+
+_atomic_alwaysinline
+static bool _atomic_can_read(size_t r, size_t w, size_t read_end, size_t n) {
+	return (n <= read_end - r);
+}
+
+_atomic_alwaysinline
+static bool _atomic_can_write(size_t r, size_t w, size_t write_end, size_t n) {
+	return (n <= write_end - (w + 1));
+}
+
+_atomic_alwaysinline
+static void _atomic_read(struct atomic_ring *__restrict ring, size_t r, void *p, size_t n) {
 	const size_t l = _atomic_min(n, ring->size - r);
 	if (l > 0) _atomic_memcpy(p, (const char *) ring->base + r, l);
 	if (n - l > 0) _atomic_memcpy((char *) p + l, ring->base, n - l);
@@ -186,7 +212,7 @@ static inline void _atomic_read(struct atomic_ring *__restrict ring, size_t r, v
 }
 
 _atomic_alwaysinline
-static inline void _atomic_write(struct atomic_ring *__restrict ring, size_t w, const void *p, size_t n) {
+static void _atomic_write(struct atomic_ring *__restrict ring, size_t w, const void *p, size_t n) {
 	const size_t l = _atomic_min(n, ring->size - w);
 	if (l > 0) _atomic_memcpy((char *) ring->base + w, p, l);
 	if (n - l > 0) _atomic_memcpy(ring->base, (const char *) p + l, n - l);
@@ -195,33 +221,33 @@ static inline void _atomic_write(struct atomic_ring *__restrict ring, size_t w, 
 }
 
 _atomic_alwaysinline
-static inline bool atomic_dequeue(struct atomic_ring *__restrict ring, void *p, size_t n) {
+static bool atomic_dequeue(struct atomic_ring *__restrict ring, void *p, size_t n) {
 	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
-	const size_t x = (w < r ? w + ring->size : w);
-	return (n <= x - r) ? _atomic_read(ring, r, p, n), true : false;
+	const size_t x = _atomic_read_end(ring, r, w);
+	return _atomic_can_read(r, w, x, n) ? _atomic_read(ring, r, p, n), true : false;
 }
 
 _atomic_alwaysinline
-static inline bool atomic_enqueue(struct atomic_ring *__restrict ring, const void *p, size_t n) {
+static bool atomic_enqueue(struct atomic_ring *__restrict ring, const void *p, size_t n) {
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
-	const size_t x = (r <= w ? r + ring->size : r);
-	return (n <= x - (w + 1)) ? _atomic_write(ring, w, p, n), true : false;
+	const size_t x = _atomic_write_end(ring, r, w);
+	return _atomic_can_write(r, w, x, n) ? _atomic_write(ring, w, p, n), true : false;
 }
 
 _atomic_alwaysinline
-static inline size_t atomic_read(struct atomic_ring *__restrict ring, void *p, size_t n) {
+static size_t atomic_read(struct atomic_ring *__restrict ring, void *p, size_t n) {
 	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
-	const size_t x = (w < r ? w + ring->size : w);
+	const size_t x = _atomic_read_end(ring, r, w);
 	const size_t k = _atomic_min(n, x - r);
 	return _atomic_read(ring, r, p, k), k;
 }
 
 _atomic_alwaysinline
-static inline size_t atomic_write(struct atomic_ring *__restrict ring, const void *p, size_t n) {
+static size_t atomic_write(struct atomic_ring *__restrict ring, const void *p, size_t n) {
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
-	const size_t x = (r <= w ? r + ring->size : r);
+	const size_t x = _atomic_write_end(ring, r, w);
 	const size_t k = _atomic_min(n, x - (w + 1));
 	return _atomic_write(ring, w, p, k), k;
 }
