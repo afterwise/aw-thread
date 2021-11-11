@@ -153,7 +153,7 @@ static void atomic_lock(atomic_spin_t *spin) {
 }
 
 _atomic_alwaysinline
-static void atomic_spin_unlock(atomic_spin_t *spin) {
+static void atomic_unlock(atomic_spin_t *spin) {
 	_atomic_release();
 	*spin = 0;
 }
