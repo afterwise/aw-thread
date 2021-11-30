@@ -33,7 +33,7 @@
 # elif __APPLE__
 #  define _DARWIN_C_SOURCE 1
 # endif
-#endif /* _nofeatures */
+#endif /* _thread_nofeatures */
 
 #include "aw-thread.h"
 
