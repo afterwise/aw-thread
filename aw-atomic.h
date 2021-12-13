@@ -1,4 +1,4 @@
-
+/* vim: set ts=4 sw=4 noet : */
 /*
    Copyright (c) 2014-2021 Malte Hildingsson, malte (at) afterwi.se
 
@@ -55,6 +55,8 @@ extern "C" {
 #endif
 
 #if __GNUC__
+# define _atomic_add32(ptr,cmp,val) (__sync_fetch_and_add((ptr), (val)))
+# define _atomic_add64(ptr,cmp,val) (__sync_fetch_and_add((ptr), (val)))
 # define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_barrier() do { __asm__ volatile ("" : : : "memory"); } while (0)
@@ -75,6 +77,8 @@ extern "C" {
 #  define _atomic_yield() do { __asm__ volatile ("yield"); } while (0)
 # endif
 #elif _MSC_VER
+# define _atomic_add32(ptr,val) (_InterlockedExchangeAdd((ptr), (val)))
+# define _atomic_add64(ptr,val) (_InterlockedExchangeAdd64((ptr), (val)))
 # define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
 # define _atomic_cas64(ptr,cmp,val) (_InterlockedCompareExchange64((ptr), (val), (cmp)))
 # define _atomic_barrier() do { _ReadWriteBarrier(); }

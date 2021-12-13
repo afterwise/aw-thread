@@ -1,4 +1,4 @@
-
+/* vim: set ts=4 sw=4 noet : */
 /*
    Copyright (c) 2014-2021 Malte Hildingsson, malte (at) afterwi.se
 
@@ -30,6 +30,16 @@
 # include <stdint.h>
 #endif
 
+#if defined(_MSC_VER) && defined(_thread_dll)
+# if _thread_dll == 1
+#  define _thread_dllexport __declspec(dllexport)
+# else
+#  define _thread_dllexport __declspec(dllimport)
+# endif
+#else
+# define _thread_dllexport
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,21 +62,33 @@ typedef uintptr_t sema_id_t;
 
 typedef void (thread_start_t)(uintptr_t user_data);
 
+_thread_dllexport
 int thread_hardware_concurrency();
 
+_thread_dllexport
 thread_id_t thread_spawn(
 	thread_start_t *start, enum thread_priority priority, int affinity,
 	size_t stack_size, uintptr_t user_data);
 
+_thread_dllexport
 void thread_exit(void);
+
+_thread_dllexport
 void thread_join(thread_id_t id);
 
+_thread_dllexport
 void thread_yield(void);
 
+_thread_dllexport
 sema_id_t sema_create(void);
+
+_thread_dllexport
 void sema_destroy(sema_id_t id);
 
+_thread_dllexport
 void sema_acquire(sema_id_t id, unsigned count);
+
+_thread_dllexport
 void sema_release(sema_id_t id, unsigned count);
 
 #ifdef __cplusplus
