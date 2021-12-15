@@ -30,14 +30,19 @@
 # include <stdint.h>
 #endif
 
-#if defined(_MSC_VER) && defined(_thread_dll)
-# if _thread_dll == 1
-#  define _thread_dllexport __declspec(dllexport)
-# else
-#  define _thread_dllexport __declspec(dllimport)
+#if defined(_thread_dllexport)
+# if _MSC_VER
+#  define _thread_api extern __declspec(dllexport)
+# elif __GNUC__
+#  define _thread_api __attribute__((visibility("default"))) extern
 # endif
-#else
-# define _thread_dllexport
+#elif defined(_thread_dllimport)
+# if _MSC_VER
+#  define _thread_api extern __declspec(dllimport)
+# endif
+#endif
+#ifndef _thread_api
+# define _thread_api extern
 #endif
 
 #ifdef __cplusplus
@@ -62,34 +67,23 @@ typedef uintptr_t sema_id_t;
 
 typedef void (thread_start_t)(uintptr_t user_data);
 
-_thread_dllexport
-int thread_hardware_concurrency();
+_thread_api int thread_hardware_concurrency();
 
-_thread_dllexport
-thread_id_t thread_spawn(
+_thread_api thread_id_t thread_spawn(
 	thread_start_t *start, enum thread_priority priority, int affinity,
 	size_t stack_size, uintptr_t user_data);
 
-_thread_dllexport
-void thread_exit(void);
+_thread_api void thread_exit(void);
 
-_thread_dllexport
-void thread_join(thread_id_t id);
+_thread_api void thread_join(thread_id_t id);
 
-_thread_dllexport
-void thread_yield(void);
+_thread_api void thread_yield(void);
 
-_thread_dllexport
-sema_id_t sema_create(void);
+_thread_api sema_id_t sema_create(void);
+_thread_api void sema_destroy(sema_id_t id);
 
-_thread_dllexport
-void sema_destroy(sema_id_t id);
-
-_thread_dllexport
-void sema_acquire(sema_id_t id, unsigned count);
-
-_thread_dllexport
-void sema_release(sema_id_t id, unsigned count);
+_thread_api void sema_acquire(sema_id_t id, unsigned count);
+_thread_api void sema_release(sema_id_t id, unsigned count);
 
 #ifdef __cplusplus
 } /* extern "C" */
