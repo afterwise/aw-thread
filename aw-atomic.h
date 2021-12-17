@@ -55,8 +55,8 @@ extern "C" {
 #endif
 
 #if __GNUC__
-# define _atomic_add32(ptr,cmp,val) (__sync_fetch_and_add((ptr), (val)))
-# define _atomic_add64(ptr,cmp,val) (__sync_fetch_and_add((ptr), (val)))
+# define _atomic_add32(ptr,val) (__sync_fetch_and_add((ptr), (val)))
+# define _atomic_add64(ptr,val) (__sync_fetch_and_add((ptr), (val)))
 # define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_barrier() do { __asm__ volatile ("" : : : "memory"); } while (0)
@@ -198,12 +198,12 @@ static size_t _atomic_read_end(const struct atomic_ring *__restrict ring, size_t
 }
 
 _atomic_alwaysinline
-static bool _atomic_can_read(size_t r, size_t w, size_t read_end, size_t n) {
+static bool _atomic_can_read(size_t r, size_t read_end, size_t n) {
 	return (n <= read_end - r);
 }
 
 _atomic_alwaysinline
-static bool _atomic_can_write(size_t r, size_t w, size_t write_end, size_t n) {
+static bool _atomic_can_write(size_t w, size_t write_end, size_t n) {
 	return (n <= write_end - (w + 1));
 }
 
@@ -229,14 +229,14 @@ static bool atomic_dequeue(struct atomic_ring *__restrict ring, void *p, size_t 
 	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
 	const size_t x = _atomic_read_end(ring, r, w);
-	return _atomic_can_read(r, w, x, n) ? _atomic_read(ring, r, p, n), true : false;
+	return _atomic_can_read(r, x, n) ? _atomic_read(ring, r, p, n), true : false;
 }
 
 _atomic_alwaysinline
 static bool atomic_enqueue(struct atomic_ring *__restrict ring, const void *p, size_t n) {
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
 	const size_t x = _atomic_write_end(ring, r, w);
-	return _atomic_can_write(r, w, x, n) ? _atomic_write(ring, w, p, n), true : false;
+	return _atomic_can_write(w, x, n) ? _atomic_write(ring, w, p, n), true : false;
 }
 
 _atomic_alwaysinline
