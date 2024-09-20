@@ -26,18 +26,18 @@
 
 #include <stddef.h>
 
-#if __GNUC__
+#if !defined(_MSC_VER) || _MSC_VER >= 1600
 # include <stdint.h>
 #endif
 
 #if defined(_thread_dllexport)
-# if _MSC_VER
+# if defined(_MSC_VER)
 #  define _thread_api extern __declspec(dllexport)
-# elif __GNUC__
+# elif defined(__GNUC__)
 #  define _thread_api __attribute__((visibility("default"))) extern
 # endif
 #elif defined(_thread_dllimport)
-# if _MSC_VER
+# if defined(_MSC_VER)
 #  define _thread_api extern __declspec(dllimport)
 # endif
 #endif
@@ -57,7 +57,7 @@ enum thread_priority {
 
 #define THREAD_NO_AFFINITY (-1)
 
-#if __CELLOS_LV2__
+#if defined(__CELLOS_LV2__)
 typedef unsigned long long thread_id_t;
 #else
 typedef uintptr_t thread_id_t;
