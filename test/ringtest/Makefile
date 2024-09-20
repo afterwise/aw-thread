@@ -5,8 +5,8 @@ export CFLAGS += -Wno-inline-new-delete -Wno-undefined-bool-conversion -Wno-depr
 test: test.o ../../libaw-thread.a
 	$(CXX) $(LDFLAGS) -o $@ $^
 
-%.o: %.cpp relacy
-	$(CXX) $(CFLAGS) -I../.. -Irelacy -include relacy/relacy.hpp -c $< -o $@
+%.o: %.x relacy
+	$(CXX) $(CFLAGS) -I../.. -Irelacy -include relacy/relacy.hpp -xc++ -c $< -o $@
 
 ../../libaw-thread.a:
 	$(MAKE) -C../..

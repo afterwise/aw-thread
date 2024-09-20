@@ -1,6 +1,6 @@
 /* vim: set ts=4 sw=4 noet : */
 /*
-   Copyright (c) 2014-2021 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2024 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,13 +24,13 @@
 #ifndef AW_ATOMIC_H
 #define AW_ATOMIC_H
 
-#if _MSC_VER
+#if defined(_MSC_VER)
 # include <intrin.h>
-#elif defined __i386__ || defined __x86_64__
+#elif defined(__i386__) || defined(__x86_64__)
 # include <xmmintrin.h>
 #endif
 
-#if !_MSC_VER || _MSC_VER >= 1800
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 # include <stdbool.h>
 #endif
 
@@ -44,9 +44,9 @@
 # define _atomic_memcpy memcpy
 #endif
 
-#if __GNUC__
+#if defined(__GNUC__)
 # define _atomic_alwaysinline inline __attribute__((always_inline))
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 # define _atomic_alwaysinline __forceinline
 #endif
 
@@ -54,29 +54,29 @@
 extern "C" {
 #endif
 
-#if __GNUC__
+#if defined(__GNUC__)
 # define _atomic_add32(ptr,val) (__sync_fetch_and_add((ptr), (val)))
 # define _atomic_add64(ptr,val) (__sync_fetch_and_add((ptr), (val)))
 # define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
 # define _atomic_barrier() do { __asm__ volatile ("" : : : "memory"); } while (0)
-# if __i386__ || __x86_64__
+# if defined(__i386__) || defined(__x86_64__)
 #  define _atomic_acquire() do { __asm__ volatile ("lfence" : : : "memory"); } while (0)
 #  define _atomic_release() do { __asm__ volatile ("sfence" : : : "memory"); } while (0)
 #  define _atomic_fence() do { __asm__ volatile ("mfence" : : : "memory"); } while (0)
 #  define _atomic_yield() do { _mm_pause(); } while (0)
-# elif __PPU__ || __ppc64__
+# elif defined(__PPU__) || defined(__ppc64__)
 #  define _atomic_acquire() do { __asm__ volatile ("sync 1" : : : "memory"); } while (0)
 #  define _atomic_release() do { __asm__ volatile ("eieio" : : : "memory"); } while (0)
 #  define _atomic_fence() do { __asm__ volatile ("sync" : : : "memory"); } while (0)
 #  define _atomic_yield() do { __asm__ volatile ("or 27,27,27"); } while (0)
-# elif __arm__ || __arm64__ || __aarch64__
+# elif defined(__arm__) || defined(__arm64__) || defined(__aarch64__)
 #  define _atomic_acquire() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _atomic_release() do { __asm__ volatile ("dmb ishst" : : : "memory"); } while (0)
 #  define _atomic_fence() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _atomic_yield() do { __asm__ volatile ("yield"); } while (0)
 # endif
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 # define _atomic_add32(ptr,val) (_InterlockedExchangeAdd((ptr), (val)))
 # define _atomic_add64(ptr,val) (_InterlockedExchangeAdd64((ptr), (val)))
 # define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
@@ -88,7 +88,7 @@ extern "C" {
 # define _atomic_yield() do { _mm_pause(); } while (0)
 #endif
 
-#ifdef RL_TEST
+#if defined(RL_TEST)
 # define _atomic_var(type) rl::atomic<type>
 # define _atomic_load(var) var.load(rl::memory_order_relaxed)
 # define _atomic_store(var,val) var.store(val, rl::memory_order_relaxed)
@@ -106,7 +106,7 @@ extern "C" {
    Once, e.g. safely lazy-create singletons shared by multiple threads.
  */
 
-#if _MSC_VER
+#if defined(_MSC_VER)
 typedef long atomic_once_t;
 #else
 typedef int atomic_once_t;
@@ -135,7 +135,7 @@ static void atomic_once_end(atomic_once_t *once) {
    Spinlock implementation.
  */
 
-#if _MSC_VER
+#if defined(_MSC_VER)
 typedef long atomic_spin_t;
 #else
 typedef int atomic_spin_t;
