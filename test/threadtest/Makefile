@@ -12,8 +12,8 @@ endif
 test: test.o ../../libaw-thread.a
 	$(CC) $(LDFLAGS) -o $@ $^
 
-%.o: %.c
-	$(CC) $(CFLAGS) -I../.. -c $< -o $@
+%.o: %.x
+	$(CC) $(CFLAGS) -I../.. -xc -c $< -o $@
 
 ../../libaw-thread.a:
 	$(MAKE) -C../..
