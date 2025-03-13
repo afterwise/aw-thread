@@ -85,6 +85,11 @@ int thread_hardware_concurrency() {
 #endif
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
 thread_id_t thread_spawn(
 		thread_start_t *start, enum thread_priority priority, int affinity,
 		size_t stack_size, uintptr_t user_data) {
@@ -173,6 +178,10 @@ thread_id_t thread_spawn(
 	return (thread_id_t) id;
 #endif
 }
+
+#if defined(__GNUC__) && !defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
 
 void thread_exit(void) {
 #if defined(_WIN32)
