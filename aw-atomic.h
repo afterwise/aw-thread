@@ -81,7 +81,7 @@ extern "C" {
 # define _atomic_add64(ptr,val) (_InterlockedExchangeAdd64((ptr), (val)))
 # define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
 # define _atomic_cas64(ptr,cmp,val) (_InterlockedCompareExchange64((ptr), (val), (cmp)))
-# define _atomic_barrier() do { _ReadWriteBarrier(); }
+# define _atomic_barrier() do { _ReadWriteBarrier(); } while (0)
 # define _atomic_acquire() do { _mm_lfence(); } while (0)
 # define _atomic_release() do { _mm_sfence(); } while (0)
 # define _atomic_fence() do { _mm_mfence(); } while (0)
