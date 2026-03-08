@@ -57,12 +57,7 @@ enum thread_priority {
 
 #define THREAD_NO_AFFINITY (-1)
 
-#if defined(__CELLOS_LV2__)
-typedef unsigned long long thread_id_t;
-#else
 typedef uintptr_t thread_id_t;
-#endif
-
 typedef uintptr_t sema_id_t;
 
 typedef void (thread_start_t)(uintptr_t user_data);

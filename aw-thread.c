@@ -39,20 +39,17 @@
 
 #if defined(_WIN32)
 # include <windows.h>
-#elif defined(__CELLOS_LV2__)
-# include <sys/ppu_thread.h>
-# include <sys/synchronization.h>
 #elif defined(__APPLE__)
 # include <mach/mach_init.h>
 # include <mach/thread_act.h>
 # include <mach/thread_policy.h>
 # include <mach/semaphore.h>
 # include <mach/task.h>
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__SCE__)
 # include <semaphore.h>
 # endif
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__linux__) || defined(__SCE__)
 # include <errno.h>
 # include <pthread.h>
 # include <sched.h>
@@ -78,10 +75,14 @@ int thread_hardware_concurrency() {
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
 	return si.dwNumberOfProcessors;
-#elif defined(__CELLOS_LV2__)
-	return 2;
 #elif defined(__linux__) || defined(__APPLE__)
 	return sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined(__SCE__)
+# if defined(__ORBIS__)
+	return 8;
+# elif defined(__PROSPERO__)
+	return 16;
+# endif
 #endif
 }
 
@@ -104,15 +105,7 @@ thread_id_t thread_spawn(
 	ResumeThread(id);
 
 	return (thread_id_t) id;
-#elif defined(__CELLOS_LV2__)
-	sys_ppu_thread_id_t id;
-
-	sys_ppu_thread_create(
-		&id, (void (*)(u64)) start, user_data, (priority + 1) * 1000,
-		stack_size, SYS_PPU_THREAD_CREATE_JOINABLE, NULL);
-
-	return id;
-#elif defined(__linux__) || defined(__APPLE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
 # if defined(__APPLE__)
 	thread_port_t tp;
 # endif
@@ -130,7 +123,7 @@ thread_id_t thread_spawn(
 
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stack_size);
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__SCE__)
 	pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 #endif
 	pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
@@ -150,7 +143,7 @@ thread_id_t thread_spawn(
 #if defined(__linux__)
 		cpu_set_t c;
 		CPU_ZERO(&c);
-		CPU_SET(id, &c);
+		CPU_SET(affinity, &c);
 		pthread_setaffinity_np(id, sizeof c, &c);
 #elif defined(__APPLE__)
 		thread_affinity_policy_data_t a;
@@ -159,6 +152,8 @@ thread_id_t thread_spawn(
 		if (thread_policy_set(tp, THREAD_AFFINITY_POLICY, (thread_policy_t) &a,
 				THREAD_AFFINITY_POLICY_COUNT) != 0)
 			fprintf(stderr, "thread_policy_set: failed\n");
+#elif defined(__SCE__)
+		scePthreadSetaffinity(id, 1 << affinity);
 #endif
 	}
 #if defined(__APPLE__)
@@ -186,9 +181,7 @@ thread_id_t thread_spawn(
 void thread_exit(void) {
 #if defined(_WIN32)
 	ExitThread(0);
-#elif defined(__CELLOS_LV2__)
-	sys_ppu_thread_exit(0);
-#elif defined(__linux__) || defined(__APPLE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
 	pthread_exit(NULL);
 #endif
 }
@@ -196,10 +189,7 @@ void thread_exit(void) {
 void thread_join(thread_id_t id) {
 #if defined(_WIN32)
 	WaitForSingleObject((HANDLE) id, INFINITE);
-#elif defined(__CELLOS_LV2__)
-	unsigned long long res;
-	sys_ppu_thread_join(id, &res);
-#elif defined(__linux__) || defined(__APPLE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
 	void *res;
 	pthread_join((pthread_t) id, &res);
 #endif
@@ -208,9 +198,7 @@ void thread_join(thread_id_t id) {
 void thread_yield(void) {
 #if defined(_WIN32)
 	SwitchToThread();
-#elif defined(__CELLOS_LV2__)
-	sys_ppu_thread_yield();
-#elif defined(__linux__) || defined(__APPLE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
 	sched_yield();
 #endif
 }
@@ -218,17 +206,11 @@ void thread_yield(void) {
 sema_id_t sema_create(void) {
 #if defined(_WIN32)
 	return (sema_id_t) CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
-#elif defined(__CELLOS_LV2__)
-	sys_sema_id_t id;
-	sys_sema_attribute_t attr;
-	sys_sema_attribute_initialize(attr);
-	sys_sema_create(&id, &attr, 0, 0x7fffffff);
-	return id;
 #elif defined(__APPLE__)
 	semaphore_t sem;
 	semaphore_create(mach_task_self(), &sem, SYNC_POLICY_FIFO, 0);
 	return sem;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__SCE__)
 	sem_t *sem = malloc(sizeof (sem_t));
 	sem_init(sem, 0, 0);
 	return (sema_id_t) sem;
@@ -238,11 +220,9 @@ sema_id_t sema_create(void) {
 void sema_destroy(sema_id_t id) {
 #if defined(_WIN32)
 	CloseHandle((HANDLE) id);
-#elif defined(__CELLOS_LV2__)
-	sys_sema_destroy((sys_sema_id_t) id);
 #elif defined(__APPLE__)
 	semaphore_destroy(mach_task_self(), id);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__SCE__)
 	sem_destroy((sem_t *) id);
 	free((sem_t *) id);
 #endif
@@ -254,14 +234,12 @@ void sema_acquire(sema_id_t id, unsigned count) {
 
 	for (i = 0; i < count; ++i)
 		WaitForSingleObject((HANDLE) id, INFINITE);
-#elif defined(__CELLOS_LV2__)
-	sys_sema_wait((sys_sema_id_t) id, count);
 #elif defined(__APPLE__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
 		semaphore_wait(id);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__SCE__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
@@ -273,14 +251,12 @@ void sema_acquire(sema_id_t id, unsigned count) {
 void sema_release(sema_id_t id, unsigned count) {
 #if defined(_WIN32)
 	ReleaseSemaphore((HANDLE) id, count, NULL);
-#elif defined(__CELLOS_LV2__)
-	sys_sema_post((sys_sema_id_t) id, count);
 #elif defined(__APPLE__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
 		semaphore_signal(id);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__SCE__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
