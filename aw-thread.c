@@ -52,6 +52,9 @@
 #if defined(__APPLE__) || defined(__linux__) || defined(__SCE__)
 # include <errno.h>
 # include <pthread.h>
+# if defined(__SCE__)
+# include <pthread_np.h>
+# endif
 # include <sched.h>
 # include <unistd.h>
 #endif
@@ -93,7 +96,8 @@ int thread_hardware_concurrency() {
 
 thread_id_t thread_spawn(
 		thread_start_t *start, enum thread_priority priority, int affinity,
-		size_t stack_size, uintptr_t user_data) {
+		size_t stack_size, uintptr_t user_data, const char* name) {
+	(void) name;
 #if defined(_WIN32)
 	HANDLE id = CreateThread(
 		NULL, stack_size, (LPTHREAD_START_ROUTINE) start, (void *) user_data,
@@ -102,6 +106,13 @@ thread_id_t thread_spawn(
 	SetThreadPriority(id, 1 - priority);
 	if (affinity != THREAD_NO_AFFINITY)
 		SetThreadAffinityMask(id, (DWORD_PTR) 1 << affinity);
+	if (name != NULL) {
+		size_t len = strlen(name) + 1;
+		wchar_t* tmp = calloc(len, sizeof(wchar_t));
+		mbstowcs_s(&len, tmp, len, name, _TRUNCATE);
+		SetThreadDescription(id, tmp);
+		free(tmp);
+	}
 	ResumeThread(id);
 
 	return (thread_id_t) id;
@@ -154,6 +165,15 @@ thread_id_t thread_spawn(
 			fprintf(stderr, "thread_policy_set: failed\n");
 #elif defined(__SCE__)
 		scePthreadSetaffinity(id, 1 << affinity);
+#endif
+	}
+	if (name != NULL) {
+#if defined(__linux__)
+		pthread_setname_np(id, name);
+#elif defined(__APPLE__)
+		pthread_setname_np(id, name, NULL);
+#elif defined(__SCE__)
+		pthread_rename_np(id, name);
 #endif
 	}
 #if defined(__APPLE__)
