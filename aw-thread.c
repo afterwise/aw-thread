@@ -109,7 +109,8 @@ thread_id_t thread_spawn(
 	if (name != NULL) {
 		size_t len = strlen(name) + 1;
 		wchar_t* tmp = calloc(len, sizeof(wchar_t));
-		mbstowcs_s(&len, tmp, len, name, _TRUNCATE);
+		size_t tmplen;
+		mbstowcs_s(&tmplen, tmp, len, name, _TRUNCATE);
 		SetThreadDescription(id, tmp);
 		free(tmp);
 	}
