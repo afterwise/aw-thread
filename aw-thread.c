@@ -61,6 +61,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(__APPLE__)
 /* from mach/thread_policy.h */
@@ -121,7 +122,7 @@ static DWORD _thread_start(LPVOID p) {
 	return 0;
 }
 #else
-static void _thread_start(void* p) {
+static void *_thread_start(void* p) {
 	struct thread_params *tp = (struct thread_params *) p;
 	thread_start_t *start = tp->start;
 	uintptr_t user_data = tp->user_data;
@@ -138,6 +139,7 @@ static void _thread_start(void* p) {
 	free(tp);
 	tp = NULL;
 	(*start)(user_data);
+	return NULL;
 }
 #endif
 
