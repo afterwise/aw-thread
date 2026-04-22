@@ -56,6 +56,7 @@
 # include <pthread_np.h>
 # endif
 # include <sched.h>
+# include <sys/types.h>
 # include <unistd.h>
 #endif
 
@@ -100,6 +101,7 @@ struct thread_params
 	thread_start_t *start;
 	uintptr_t user_data;
 	char* name;
+	int affinity;
 };
 
 #if defined(_WIN32)
@@ -136,6 +138,20 @@ static void *_thread_start(void* p) {
 # endif
 		free(params->name);
 	}
+	if (params->affinity != THREAD_NO_AFFINITY) {
+# if defined(__linux__)
+		cpu_set_t c;
+		CPU_ZERO(&c);
+		CPU_SET(params->affinity, &c);
+#  if defined(__ANDROID__)
+		sched_setaffinity(gettid(), sizeof c, &c);
+#  else
+		pthread_setaffinity_np(pthread_self(), sizeof c, &c);
+#  endif
+# elif defined(__SCE__)
+		scePthreadSetaffinity(pthread_self(), 1 << params->affinity);
+# endif
+	}
 	free(params);
 	params = NULL;
 	(*start)(user_data);
@@ -152,6 +168,7 @@ thread_id_t thread_spawn(
 	params->start = start;
 	params->user_data = user_data;
 	params->name = (name != NULL) ? _strdup(name) : NULL;
+	params->affinity = affinity;
 	id = CreateThread(NULL, stack_size, _thread_start, params, CREATE_SUSPENDED, NULL);
 	SetThreadPriority(id, 1 - priority);
 	if (affinity != THREAD_NO_AFFINITY)
@@ -172,6 +189,7 @@ thread_id_t thread_spawn(
 	params->start = start;
 	params->user_data = user_data;
 	params->name = (name != NULL) ? strdup(name) : NULL;
+	params->affinity = affinity;
 
 	pritab[0] = sched_get_priority_min(SCHED_FIFO);
 	pritab[2] = sched_get_priority_max(SCHED_FIFO);
@@ -197,24 +215,15 @@ thread_id_t thread_spawn(
 # endif
 		if ((err = pthread_create(&id, &attr, _thread_start, params)) != 0)
 			errno = err, perror("pthread_create");
+# if defined(__APPLE__)
 	if (affinity != THREAD_NO_AFFINITY) {
-# if defined(__linux__)
-		cpu_set_t c;
-		CPU_ZERO(&c);
-		CPU_SET(affinity, &c);
-		pthread_setaffinity_np(id, sizeof c, &c);
-# elif defined(__APPLE__)
 		thread_affinity_policy_data_t a;
 		memset(&a, 0, sizeof a);
 		a.affinity_tag = affinity + 1;
 		if (thread_policy_set(tp, THREAD_AFFINITY_POLICY, (thread_policy_t) &a,
 				THREAD_AFFINITY_POLICY_COUNT) != 0)
 			fprintf(stderr, "thread_policy_set: failed\n");
-# elif defined(__SCE__)
-		scePthreadSetaffinity(id, 1 << affinity);
-# endif
 	}
-# if defined(__APPLE__)
 	if (priority == THREAD_HIGH_PRIORITY) {
 		thread_extended_policy_data_t e;
 		memset(&e, 0, sizeof e);
