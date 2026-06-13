@@ -24,7 +24,7 @@
 #ifndef _thread_nofeatures
 # if defined(_WIN32)
 #  define WIN32_LEAN_AND_MEAN 1
-# elif defined(__linux__)
+# elif defined(__linux__) || defined(__NINTENDO__)
 #  define _BSD_SOURCE 1
 #  define _GNU_SOURCE 1
 #  define _DEFAULT_SOURCE 1
@@ -45,15 +45,15 @@
 # include <mach/thread_policy.h>
 # include <mach/semaphore.h>
 # include <mach/task.h>
-#elif defined(__linux__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 # include <semaphore.h>
-# endif
+#endif
 
-#if defined(__APPLE__) || defined(__linux__) || defined(__SCE__)
+#if defined(__APPLE__) || defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 # include <errno.h>
 # include <pthread.h>
 # if defined(__SCE__)
-# include <pthread_np.h>
+#  include <pthread_np.h>
 # endif
 # include <sched.h>
 # include <sys/types.h>
@@ -88,6 +88,8 @@ int thread_hardware_concurrency() {
 # elif defined(__PROSPERO__)
 	return 16;
 # endif
+#elif defined(__NINTENDO__)
+	return pthread_getconcurrency();
 #endif
 }
 
@@ -131,7 +133,7 @@ static void *_thread_start(void* p) {
 	if (params->name != NULL) {
 # if defined(__APPLE__)
 		pthread_setname_np(params->name);
-# elif defined(__linux__)
+# elif defined(__linux__) || defined(__NINTENDO__)
 		pthread_setname_np(pthread_self(), params->name);
 # elif defined(__SCE__)
 		pthread_rename_np(pthread_self(), params->name);
@@ -139,7 +141,7 @@ static void *_thread_start(void* p) {
 		free(params->name);
 	}
 	if (params->affinity != THREAD_NO_AFFINITY) {
-# if defined(__linux__)
+# if defined(__linux__) || defined(__NINTENDO__)
 		cpu_set_t c;
 		CPU_ZERO(&c);
 		CPU_SET(params->affinity, &c);
@@ -175,7 +177,7 @@ thread_id_t thread_spawn(
 		SetThreadAffinityMask(id, (DWORD_PTR) 1 << affinity);
 	ResumeThread(id);
 	return (thread_id_t) id;
-#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__) || defined(__NINTENDO__)
 # if defined(__APPLE__)
 	thread_port_t tp;
 # endif
@@ -199,13 +201,19 @@ thread_id_t thread_spawn(
 
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stack_size);
-# if defined(__APPLE__) || defined(__SCE__)
+# if defined(__APPLE__) || defined(__SCE__) || defined(__NINTENDO__)
 	pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 # endif
 	pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 	pthread_attr_setschedparam(&attr, &param);
 	if (priority == THREAD_HIGH_PRIORITY)
+	{
+# if defined(__NINTENDO__)
+		pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);
+# else
 		pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+# endif
+	}
 # if defined(__APPLE__)
 	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY) {
 		if ((err = pthread_create_suspended_np(&id, &attr, _thread_start, params)) != 0)
@@ -248,7 +256,7 @@ thread_id_t thread_spawn(
 void thread_exit(void) {
 #if defined(_WIN32)
 	ExitThread(0);
-#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__) || defined(__NINTENDO__)
 	pthread_exit(NULL);
 #endif
 }
@@ -256,7 +264,7 @@ void thread_exit(void) {
 void thread_join(thread_id_t id) {
 #if defined(_WIN32)
 	WaitForSingleObject((HANDLE) id, INFINITE);
-#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__) || defined(__NINTENDO__)
 	void *res;
 	pthread_join((pthread_t) id, &res);
 #endif
@@ -265,7 +273,7 @@ void thread_join(thread_id_t id) {
 void thread_yield(void) {
 #if defined(_WIN32)
 	SwitchToThread();
-#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__) || defined(__NINTENDO__)
 	sched_yield();
 #endif
 }
@@ -277,7 +285,7 @@ sema_id_t sema_create(void) {
 	semaphore_t sem;
 	semaphore_create(mach_task_self(), &sem, SYNC_POLICY_FIFO, 0);
 	return sem;
-#elif defined(__linux__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 	sem_t *sem = malloc(sizeof (sem_t));
 	sem_init(sem, 0, 0);
 	return (sema_id_t) sem;
@@ -289,7 +297,7 @@ void sema_destroy(sema_id_t id) {
 	CloseHandle((HANDLE) id);
 #elif defined(__APPLE__)
 	semaphore_destroy(mach_task_self(), id);
-#elif defined(__linux__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 	sem_destroy((sem_t *) id);
 	free((sem_t *) id);
 #endif
@@ -306,7 +314,7 @@ void sema_acquire(sema_id_t id, unsigned count) {
 
 	for (i = 0; i < count; ++i)
 		semaphore_wait(id);
-#elif defined(__linux__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
@@ -323,7 +331,7 @@ void sema_release(sema_id_t id, unsigned count) {
 
 	for (i = 0; i < count; ++i)
 		semaphore_signal(id);
-#elif defined(__linux__) || defined(__SCE__)
+#elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
