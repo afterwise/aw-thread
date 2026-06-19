@@ -54,11 +54,19 @@
 extern "C" {
 #endif
 
+/*
+   _atomic_add32, _atomic_add64, _atomic_cas32, _atomic_cas64 return
+   the original value before as it was before the atomic operation.
+
+   _atomic barrier is a compiler-only barrier, while _atomic_acquire,
+   _atomic_release and _atomic_fence are cpu fence instructions.
+*/
+
 #if defined(__GNUC__)
-# define _atomic_add32(ptr,val) (__sync_fetch_and_add((ptr), (val)))
-# define _atomic_add64(ptr,val) (__sync_fetch_and_add((ptr), (val)))
-# define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
-# define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap((ptr), (cmp), (val)))
+# define _atomic_add32(ptr,val) (__sync_fetch_and_add(((volatile int *) ptr), ((int) val)))
+# define _atomic_add64(ptr,val) (__sync_fetch_and_add(((volatile long long int *) ptr), ((long long int) val)))
+# define _atomic_cas32(ptr,cmp,val) (__sync_val_compare_and_swap(((volatile int *) ptr), ((int) cmp), ((int) val)))
+# define _atomic_cas64(ptr,cmp,val) (__sync_val_compare_and_swap(((volatile long long int *) ptr), ((long long int) cmp), ((long long int) val)))
 # define _atomic_barrier() do { __asm__ volatile ("" : : : "memory"); } while (0)
 # if defined(__i386__) || defined(__x86_64__)
 #  define _atomic_acquire() do { __asm__ volatile ("lfence" : : : "memory"); } while (0)
@@ -77,10 +85,10 @@ extern "C" {
 #  define _atomic_yield() do { __asm__ volatile ("yield"); } while (0)
 # endif
 #elif defined(_MSC_VER)
-# define _atomic_add32(ptr,val) (_InterlockedExchangeAdd((ptr), (val)))
-# define _atomic_add64(ptr,val) (_InterlockedExchangeAdd64((ptr), (val)))
-# define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange((ptr), (val), (cmp)))
-# define _atomic_cas64(ptr,cmp,val) (_InterlockedCompareExchange64((ptr), (val), (cmp)))
+# define _atomic_add32(ptr,val) (_InterlockedExchangeAdd(((volatile long *) ptr), ((long) val)))
+# define _atomic_add64(ptr,val) (_InterlockedExchangeAdd64(((volatile __int64 *) ptr), ((__int64) val)))
+# define _atomic_cas32(ptr,cmp,val) (_InterlockedCompareExchange(((volatile long *) ptr), ((long) val), ((long) cmp)))
+# define _atomic_cas64(ptr,cmp,val) (_InterlockedCompareExchange64(((volatile __int64 *) ptr), ((__int64) val), ((__int64) cmp)))
 # define _atomic_barrier() do { _ReadWriteBarrier(); } while (0)
 # if defined(_M_IX86) || defined(_M_X64)
 #  define _atomic_acquire() do { _mm_lfence(); } while (0)
