@@ -107,7 +107,7 @@ struct thread_params
 };
 
 #if defined(_WIN32)
-static DWORD _thread_start(LPVOID p) {
+static DWORD WINAPI _thread_start(LPVOID p) {
 	struct thread_params *params = (struct thread_params *) p;
 	thread_start_t *start = params->start;
 	uintptr_t user_data = params->user_data;
