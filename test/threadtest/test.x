@@ -2,6 +2,7 @@
 #include "aw-atomic.h"
 #include "aw-thread.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct tdata {
 	sema_id_t sema;
@@ -41,12 +42,14 @@ int main(int argc, char *argv[]) {
 
 	thread_id_t y[n];
 	for (int i = 0; i < n; ++i)
-		y[i] = thread_spawn(&tmain, THREAD_LOW_PRIORITY, THREAD_NO_AFFINITY, 8192, (uintptr_t) &x[i]);
+		y[i] = thread_spawn(&tmain, THREAD_LOW_PRIORITY, THREAD_NO_AFFINITY, 8192, (uintptr_t) &x[i], x[i].str);
 
 	sema_release(s, n);
 
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < n; ++i) {
 		thread_join(y[i]);
+		free(x[i].str);
+	}
 
 	sema_destroy(s);
 

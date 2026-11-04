@@ -12,7 +12,7 @@ struct queue_test : rl::test_suite<queue_test, 2> {
 	}
 
 	void thread(unsigned thread_index) {
-		struct __attribute__((packed)) weird { int i; char c; } x = {1}, y;
+		struct __attribute__((packed)) weird { int i; char c; } x = {1}, y = {0};
 		const int count = 50;
 		if (thread_index == 0)
 			while (x.i <= count) {
