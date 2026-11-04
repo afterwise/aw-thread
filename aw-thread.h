@@ -64,6 +64,7 @@ typedef void (thread_start_t)(uintptr_t user_data);
 
 _thread_api int thread_hardware_concurrency();
 
+/* returns 0 if the thread could not be created */
 _thread_api thread_id_t thread_spawn(
 	thread_start_t *start, enum thread_priority priority, int affinity,
 	size_t stack_size, uintptr_t user_data, const char* name);

@@ -167,11 +167,18 @@ thread_id_t thread_spawn(
 #if defined(_WIN32)
 	HANDLE id;
 	struct thread_params *params = (struct thread_params *) malloc(sizeof (struct thread_params));
+	if (params == NULL)
+		return 0;
 	params->start = start;
 	params->user_data = user_data;
 	params->name = (name != NULL) ? _strdup(name) : NULL;
 	params->affinity = affinity;
 	id = CreateThread(NULL, stack_size, _thread_start, params, CREATE_SUSPENDED, NULL);
+	if (id == NULL) {
+		free(params->name);
+		free(params);
+		return 0;
+	}
 	SetThreadPriority(id, 1 - priority);
 	if (affinity != THREAD_NO_AFFINITY)
 		SetThreadAffinityMask(id, (DWORD_PTR) 1 << affinity);
@@ -188,6 +195,8 @@ thread_id_t thread_spawn(
 	int err;
 
 	struct thread_params *params = (struct thread_params *) malloc(sizeof (struct thread_params));
+	if (params == NULL)
+		return 0;
 	params->start = start;
 	params->user_data = user_data;
 	params->name = (name != NULL) ? strdup(name) : NULL;
@@ -219,12 +228,18 @@ thread_id_t thread_spawn(
 	if (affinity != THREAD_NO_AFFINITY || priority == THREAD_HIGH_PRIORITY) {
 		if ((err = pthread_create_suspended_np(&id, &attr, _thread_start, params)) != 0)
 			errno = err, perror("pthread_create_suspended_np");
-		tp = pthread_mach_thread_np(id);
 	} else
 # endif
 		if ((err = pthread_create(&id, &attr, _thread_start, params)) != 0)
 			errno = err, perror("pthread_create");
+	if (err != 0) {
+		pthread_attr_destroy(&attr);
+		free(params->name);
+		free(params);
+		return 0;
+	}
 # if defined(__APPLE__)
+	tp = pthread_mach_thread_np(id);
 	if (affinity != THREAD_NO_AFFINITY) {
 		thread_affinity_policy_data_t a;
 		memset(&a, 0, sizeof a);
@@ -263,6 +278,8 @@ void thread_exit(void) {
 }
 
 void thread_join(thread_id_t id) {
+	if (id == 0)
+		return;
 #if defined(_WIN32)
 	WaitForSingleObject((HANDLE) id, INFINITE);
 	CloseHandle((HANDLE) id);
