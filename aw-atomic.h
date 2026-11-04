@@ -84,6 +84,11 @@ extern "C" {
 #  define _atomic_release() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _atomic_fence() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _atomic_yield() do { __asm__ volatile ("yield"); } while (0)
+# else
+#  define _atomic_acquire() do { __sync_synchronize(); } while (0)
+#  define _atomic_release() do { __sync_synchronize(); } while (0)
+#  define _atomic_fence() do { __sync_synchronize(); } while (0)
+#  define _atomic_yield() do { } while (0)
 # endif
 #elif defined(_MSC_VER)
 # define _atomic_add32(ptr,val) (_InterlockedExchangeAdd(((volatile long *) (ptr)), ((long) (val))))
