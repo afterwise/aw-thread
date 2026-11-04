@@ -193,7 +193,7 @@ struct atomic_ring {
 
 _atomic_alwaysinline
 static void atomic_ring_init(struct atomic_ring *ring, void *base, size_t size) {
-	_atomic_assert((size & (size - 1)) == 0);
+	_atomic_assert(size != 0 && (size & (size - 1)) == 0);
 	ring->base = base;
 	ring->size = size;
 	_atomic_store(ring->read, 0);
