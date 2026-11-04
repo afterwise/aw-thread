@@ -6,7 +6,7 @@ test: test.o ../../libaw-thread.a
 	$(CXX) $(LDFLAGS) -o $@ $^
 
 %.o: %.x relacy
-	$(CXX) $(CFLAGS) -I../.. -Irelacy -include relacy/relacy.hpp -xc++ -c $< -o $@
+	$(CXX) $(CFLAGS) -std=c++20 -I../.. -Irelacy -include relacy/relacy.hpp -xc++ -c $< -o $@
 
 ../../libaw-thread.a:
 	$(MAKE) -C../..
