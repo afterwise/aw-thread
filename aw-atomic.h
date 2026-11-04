@@ -139,6 +139,7 @@ static bool atomic_once_init(atomic_once_t *once) {
 	case 1:
 		do _atomic_yield();
 		while (*(volatile atomic_once_t *) once != 2);
+		/* fall through */
 	case 2:
 		_atomic_acquire();
 		return false;
