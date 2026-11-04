@@ -23,7 +23,9 @@
 
 #ifndef _thread_nofeatures
 # if defined(_WIN32)
-#  define WIN32_LEAN_AND_MEAN 1
+#  ifndef WIN32_LEAN_AND_MEAN
+#   define WIN32_LEAN_AND_MEAN 1
+#  endif
 # elif defined(__linux__) || defined(__NINTENDO__)
 #  define _BSD_SOURCE 1
 #  define _GNU_SOURCE 1
