@@ -75,6 +75,7 @@ _thread_api void thread_join(thread_id_t id);
 
 _thread_api void thread_yield(void);
 
+/* returns 0 if the semaphore could not be created */
 _thread_api sema_id_t sema_create(void);
 _thread_api void sema_destroy(sema_id_t id);
 

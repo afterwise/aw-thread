@@ -304,11 +304,17 @@ sema_id_t sema_create(void) {
 	return (sema_id_t) CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
 #elif defined(__APPLE__)
 	semaphore_t sem;
-	semaphore_create(mach_task_self(), &sem, SYNC_POLICY_FIFO, 0);
+	if (semaphore_create(mach_task_self(), &sem, SYNC_POLICY_FIFO, 0) != KERN_SUCCESS)
+		return 0;
 	return sem;
 #elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 	sem_t *sem = malloc(sizeof (sem_t));
-	sem_init(sem, 0, 0);
+	if (sem == NULL)
+		return 0;
+	if (sem_init(sem, 0, 0) < 0) {
+		free(sem);
+		return 0;
+	}
 	return (sema_id_t) sem;
 #endif
 }
