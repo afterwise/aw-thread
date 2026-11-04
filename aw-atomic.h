@@ -226,6 +226,7 @@ static bool _atomic_can_write(size_t w, size_t write_end, size_t n) {
 _atomic_alwaysinline
 static void _atomic_read(struct atomic_ring *__restrict ring, size_t r, void *p, size_t n) {
 	const size_t l = _atomic_min(n, ring->size - r);
+	_atomic_acquire();
 	if (l > 0) _atomic_memcpy(p, (const char *) ring->base + r, l);
 	if (n - l > 0) _atomic_memcpy((char *) p + l, ring->base, n - l);
 	_atomic_store(ring->read, (r + n) & (ring->size - 1));
@@ -234,6 +235,7 @@ static void _atomic_read(struct atomic_ring *__restrict ring, size_t r, void *p,
 _atomic_alwaysinline
 static void _atomic_write(struct atomic_ring *__restrict ring, size_t w, const void *p, size_t n) {
 	const size_t l = _atomic_min(n, ring->size - w);
+	_atomic_acquire();
 	if (l > 0) _atomic_memcpy((char *) ring->base + w, p, l);
 	if (n - l > 0) _atomic_memcpy(ring->base, (const char *) p + l, n - l);
 	_atomic_release();
@@ -242,7 +244,6 @@ static void _atomic_write(struct atomic_ring *__restrict ring, size_t w, const v
 
 _atomic_alwaysinline
 static bool atomic_dequeue(struct atomic_ring *__restrict ring, void *p, size_t n) {
-	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
 	const size_t x = _atomic_read_end(ring, r, w);
 	return _atomic_can_read(r, x, n) ? _atomic_read(ring, r, p, n), true : false;
@@ -257,7 +258,6 @@ static bool atomic_enqueue(struct atomic_ring *__restrict ring, const void *p, s
 
 _atomic_alwaysinline
 static size_t atomic_read(struct atomic_ring *__restrict ring, void *p, size_t n) {
-	_atomic_acquire();
 	const size_t r = _atomic_load(ring->read), w = _atomic_load(ring->write);
 	const size_t x = _atomic_read_end(ring, r, w);
 	const size_t k = _atomic_min(n, x - r);
