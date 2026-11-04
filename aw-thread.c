@@ -115,9 +115,11 @@ static DWORD WINAPI _thread_start(LPVOID p) {
 		size_t len = strlen(params->name) + 1;
 		wchar_t* tmp = calloc(len, sizeof(wchar_t));
 		size_t tmplen;
-		mbstowcs_s(&tmplen, tmp, len, params->name, _TRUNCATE);
-		SetThreadDescription(GetCurrentThread(), tmp);
-		free(tmp);
+		if (tmp != NULL) {
+			mbstowcs_s(&tmplen, tmp, len, params->name, _TRUNCATE);
+			SetThreadDescription(GetCurrentThread(), tmp);
+			free(tmp);
+		}
 		free(params->name);
 	}
 	free(params);
