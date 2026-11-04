@@ -313,13 +313,15 @@ void sema_acquire(sema_id_t id, unsigned count) {
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
-		semaphore_wait(id);
+		while (semaphore_wait(id) == KERN_ABORTED)
+			;
 #elif defined(__linux__) || defined(__SCE__) || defined(__NINTENDO__)
 	unsigned i;
 
 	for (i = 0; i < count; ++i)
-		if (sem_wait((sem_t *) id) < 0)
-			abort();
+		while (sem_wait((sem_t *) id) < 0)
+			if (errno != EINTR)
+				abort();
 #endif
 }
 
