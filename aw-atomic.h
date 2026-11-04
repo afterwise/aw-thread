@@ -229,6 +229,7 @@ static void _atomic_read(struct atomic_ring *__restrict ring, size_t r, void *p,
 	_atomic_acquire();
 	if (l > 0) _atomic_memcpy(p, (const char *) ring->base + r, l);
 	if (n - l > 0) _atomic_memcpy((char *) p + l, ring->base, n - l);
+	_atomic_release();
 	_atomic_store(ring->read, (r + n) & (ring->size - 1));
 }
 
