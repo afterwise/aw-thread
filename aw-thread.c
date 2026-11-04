@@ -81,15 +81,16 @@ int thread_hardware_concurrency() {
 	GetSystemInfo(&si);
 	return si.dwNumberOfProcessors;
 #elif defined(__linux__) || defined(__APPLE__)
-	return sysconf(_SC_NPROCESSORS_ONLN);
-#elif defined(__SCE__)
-# if defined(__ORBIS__)
+	long n = sysconf(_SC_NPROCESSORS_ONLN);
+	return n > 0 ? (int) n : 1;
+#elif defined(__SCE__) && defined(__ORBIS__)
 	return 8;
-# elif defined(__PROSPERO__)
+#elif defined(__SCE__) && defined(__PROSPERO__)
 	return 16;
-# endif
 #elif defined(__NINTENDO__)
 	return pthread_getconcurrency();
+#else
+	return 1;
 #endif
 }
 
