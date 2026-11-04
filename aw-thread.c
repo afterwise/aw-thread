@@ -265,6 +265,7 @@ void thread_exit(void) {
 void thread_join(thread_id_t id) {
 #if defined(_WIN32)
 	WaitForSingleObject((HANDLE) id, INFINITE);
+	CloseHandle((HANDLE) id);
 #elif defined(__linux__) || defined(__APPLE__) || defined(__SCE__) || defined(__NINTENDO__)
 	void *res;
 	pthread_join((pthread_t) id, &res);
