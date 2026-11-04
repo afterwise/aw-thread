@@ -182,7 +182,7 @@ thread_id_t thread_spawn(
 		return 0;
 	}
 	SetThreadPriority(id, 1 - priority);
-	if (affinity != THREAD_NO_AFFINITY)
+	if (affinity >= 0 && affinity < (int) (sizeof (DWORD_PTR) * 8))
 		SetThreadAffinityMask(id, (DWORD_PTR) 1 << affinity);
 	ResumeThread(id);
 	return (thread_id_t) id;
