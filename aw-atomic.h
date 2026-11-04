@@ -76,12 +76,12 @@ extern "C" {
 #  define _atomic_yield() do { _mm_pause(); } while (0)
 # elif defined(__PPU__) || defined(__ppc64__)
 #  define _atomic_acquire() do { __asm__ volatile ("sync 1" : : : "memory"); } while (0)
-#  define _atomic_release() do { __asm__ volatile ("eieio" : : : "memory"); } while (0)
+#  define _atomic_release() do { __asm__ volatile ("sync 1" : : : "memory"); } while (0)
 #  define _atomic_fence() do { __asm__ volatile ("sync" : : : "memory"); } while (0)
 #  define _atomic_yield() do { __asm__ volatile ("or 27,27,27"); } while (0)
 # elif defined(__arm__) || defined(__arm64__) || defined(__aarch64__)
 #  define _atomic_acquire() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
-#  define _atomic_release() do { __asm__ volatile ("dmb ishst" : : : "memory"); } while (0)
+#  define _atomic_release() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _atomic_fence() do { __asm__ volatile ("dmb ish" : : : "memory"); } while (0)
 #  define _atomic_yield() do { __asm__ volatile ("yield"); } while (0)
 # endif
@@ -98,7 +98,7 @@ extern "C" {
 #  define _atomic_yield() do { _mm_pause(); } while (0)
 # elif defined(_M_ARM64)
 #  define _atomic_acquire() do { __dmb(_ARM64_BARRIER_ISH); } while (0)
-#  define _atomic_release() do { __dmb(_ARM64_BARRIER_ISHST); } while (0)
+#  define _atomic_release() do { __dmb(_ARM64_BARRIER_ISH); } while (0)
 #  define _atomic_fence() do { __dmb(_ARM64_BARRIER_ISH); } while (0)
 #  define _atomic_yield() do { __yield(); } while (0)
 # endif
