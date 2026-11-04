@@ -193,9 +193,10 @@ thread_id_t thread_spawn(
 	params->name = (name != NULL) ? strdup(name) : NULL;
 	params->affinity = affinity;
 
-	pritab[0] = sched_get_priority_min(SCHED_FIFO);
-	pritab[2] = sched_get_priority_max(SCHED_FIFO);
-	pritab[1] = (pritab[0] + pritab[2]) / 2;
+	/* larger numbers are higher priorities */
+	pritab[THREAD_HIGH_PRIORITY] = sched_get_priority_max(SCHED_FIFO);
+	pritab[THREAD_LOW_PRIORITY] = sched_get_priority_min(SCHED_FIFO);
+	pritab[THREAD_NORMAL_PRIORITY] = (pritab[THREAD_HIGH_PRIORITY] + pritab[THREAD_LOW_PRIORITY]) / 2;
 
 	param.sched_priority = pritab[priority];
 
